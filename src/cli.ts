@@ -61,7 +61,10 @@ Once a connection is saved, interact with it using:
   .version("0.1.0");
 
 // --- shared connect handler ---
-async function connectAction(url: string, opts: { name?: string; ngrok?: boolean; open?: boolean }) {
+async function connectAction(
+  url: string,
+  opts: { name?: string; ngrok?: boolean; open?: boolean },
+) {
   const name = opts.name ?? new URL(url).hostname.split(".")[0] ?? "server";
   const noOpen = opts.open === false;
   console.log(`Connecting to ${url} as "${name}"...`);

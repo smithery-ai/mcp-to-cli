@@ -142,10 +142,10 @@ mcp-to-cli <connection> tools call --help
 
 All config lives in `~/.mcp-to-cli/`:
 
-| File | Purpose |
-|------|---------|
+| File               | Purpose                                         |
+| ------------------ | ----------------------------------------------- |
 | `connections.json` | Saved server connections (name, URL, timestamp) |
-| `auth-<name>.json` | OAuth tokens for each connection |
+| `auth-<name>.json` | OAuth tokens for each connection                |
 
 ## Running in Development
 
