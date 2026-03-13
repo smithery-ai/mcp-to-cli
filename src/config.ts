@@ -10,6 +10,7 @@ export interface StoredConnection {
   url: string;
   addedAt: string;
   useNgrok?: boolean;
+  noOpen?: boolean;
 }
 
 export interface StoredAuth {

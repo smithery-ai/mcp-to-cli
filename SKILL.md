@@ -9,7 +9,7 @@ description: How to use the mcp-to-cli command-line tool to connect to remote MC
 
 ## Important: Auth URLs
 
-When this CLI triggers an OAuth flow, it opens a browser automatically. **If you are an AI agent using this skill, do NOT open the auth URL directly or click it.** Instead, tell the user to open the URL in their browser manually. The CLI prints the URL to the terminal — relay it to the user and ask them to visit it. The CLI listens on a local callback server at `http://localhost:8912/<connection>/callback` for the OAuth redirect, so the user just needs to complete auth in their browser and it will be captured automatically.
+When this CLI triggers an OAuth flow, it opens a browser automatically. **If you are an AI agent using this skill, always pass `--no-open` when connecting** so the auth URL is printed to the terminal instead of opening a browser. Relay the printed URL to the user and ask them to visit it. The CLI listens on a local callback server at `http://localhost:8912/<connection>/callback` for the OAuth redirect, so the user just needs to complete auth in their browser and it will be captured automatically.
 
 ## Installation
 
@@ -29,6 +29,9 @@ bun install
 # Connect to an MCP server (this saves the connection for future use)
 mcp-to-cli connect https://mcp.notion.com/mcp --name notion
 
+# Connect without opening a browser (prints the auth URL instead)
+mcp-to-cli connect https://mcp.notion.com/mcp --name notion --no-open
+
 # List available tools
 mcp-to-cli notion tools list
 
@@ -45,10 +48,10 @@ mcp-to-cli notion tools call search --args '{"query": "meeting notes"}'
 
 ```bash
 # Connect and save (shorthand)
-mcp-to-cli connect <url> [--name <name>] [--ngrok]
+mcp-to-cli connect <url> [--name <name>] [--ngrok] [--no-open]
 
 # Manage connections
-mcp-to-cli connections add <url> [--name <name>] [--ngrok]
+mcp-to-cli connections add <url> [--name <name>] [--ngrok] [--no-open]
 mcp-to-cli connections list          # or: connections ls
 mcp-to-cli connections remove <name> # or: connections rm
 ```
@@ -100,10 +103,11 @@ mcp-to-cli <connection> prompts get <prompt_name>
 The CLI supports OAuth 2.0 with PKCE. When a server requires authentication:
 
 1. The CLI detects the `UnauthorizedError` and starts an OAuth flow
-2. It opens your browser to the authorization URL
+2. By default it opens your browser to the authorization URL. Pass `--no-open` to print the URL instead.
 3. A shared local callback server listens on `http://localhost:8912/<connection>/callback`
 4. After you authorize in the browser, the CLI exchanges the code for tokens
 5. Tokens are saved to `~/.mcp-to-cli/auth-<connection-name>.json` and reused automatically
+6. The `--no-open` preference is saved with the connection and used automatically on future requests
 
 If the browser doesn't open automatically, the CLI prints the authorization URL to the terminal — copy and paste it into your browser.
 
@@ -154,8 +158,8 @@ bun dev          # Watch mode (auto-restart on changes)
 
 ```bash
 # 1. Connect to Notion's MCP server
-mcp-to-cli connect https://mcp.notion.com/mcp --name notion
-# (Browser opens for OAuth — authorize in the browser)
+mcp-to-cli connect https://mcp.notion.com/mcp --name notion --no-open
+# (Auth URL is printed — open it in your browser to authorize)
 
 # 2. Explore available tools
 mcp-to-cli notion tools list

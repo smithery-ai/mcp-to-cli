@@ -63,6 +63,12 @@ bun start --help
 mcp-to-cli connect https://example.com/mcp --name example
 ```
 
+Print the OAuth URL instead of opening a browser:
+
+```bash
+mcp-to-cli connect https://example.com/mcp --name example --no-open
+```
+
 Use ngrok for OAuth callbacks:
 
 ```bash
@@ -72,7 +78,7 @@ mcp-to-cli connect https://example.com/mcp --name example --ngrok
 Equivalent command:
 
 ```bash
-mcp-to-cli connections add https://example.com/mcp --name example
+mcp-to-cli connections add https://example.com/mcp --name example [--no-open]
 ```
 
 If `--name` is omitted, the CLI derives a name from the server hostname.
@@ -173,10 +179,11 @@ mcp-to-cli example prompts get summarize_release
 
 For servers that require OAuth:
 
-1. The CLI opens the system browser.
+1. The CLI opens the system browser (or prints the URL if `--no-open` was used).
 2. It listens on a shared local callback server at `http://localhost:8912/<connection>/callback`.
 3. If the connection was created with `--ngrok`, the redirect URI uses the ngrok URL for that same callback path instead of localhost.
 4. After approval, tokens are stored for the saved connection and reused on future requests.
+5. Both `--ngrok` and `--no-open` preferences are saved with the connection and applied automatically on future requests.
 
 ## Local data
 
