@@ -22,6 +22,7 @@ async function connectWithAuth(url: string, authProvider: CliOAuthProvider): Pro
     try {
       const transport = createTransport();
       await client.connect(transport);
+      await authProvider.cleanup();
       return client;
     } catch (e) {
       if (e instanceof UnauthorizedError) {
@@ -32,25 +33,28 @@ async function connectWithAuth(url: string, authProvider: CliOAuthProvider): Pro
         }
 
         console.log("Waiting for browser authorization...");
-        const code = await authProvider.authCodePromise;
-        authProvider.cleanup();
-        console.log("Authorization code received! Exchanging for tokens...\n");
+        try {
+          const code = await authProvider.authCodePromise;
+          console.log("Authorization code received! Exchanging for tokens...\n");
 
-        // Exchange the code for tokens
-        const authResult = await auth(authProvider, {
-          serverUrl,
-          authorizationCode: code,
-        });
+          // Exchange the code for tokens
+          const authResult = await auth(authProvider, {
+            serverUrl,
+            authorizationCode: code,
+          });
 
-        if (authResult !== "AUTHORIZED") {
-          throw new Error("Failed to exchange authorization code for tokens.");
+          if (authResult !== "AUTHORIZED") {
+            throw new Error("Failed to exchange authorization code for tokens.");
+          }
+
+          // Now retry connection with tokens
+          const retryTransport = createTransport();
+          const retryClient = new Client({ name: "mcp-to-cli", version: "1.0.0" });
+          await retryClient.connect(retryTransport);
+          return retryClient;
+        } finally {
+          await authProvider.cleanup();
         }
-
-        // Now retry connection with tokens
-        const retryTransport = createTransport();
-        const retryClient = new Client({ name: "mcp-to-cli", version: "1.0.0" });
-        await retryClient.connect(retryTransport);
-        return retryClient;
       }
       lastError = e as Error;
       // Try next transport
@@ -66,23 +70,27 @@ export async function createClient(name: string): Promise<Client> {
     throw new Error(`Connection "${name}" not found. Run: mcp-to-cli connect <url> --name ${name}`);
   }
 
-  const authProvider = new CliOAuthProvider(name);
+  const authProvider = new CliOAuthProvider(name, connection.url, connection.useNgrok);
 
   try {
     return await connectWithAuth(connection.url, authProvider);
   } catch (e) {
-    authProvider.cleanup();
+    await authProvider.cleanup();
     throw e;
   }
 }
 
-export async function connectAndSave(url: string, name: string): Promise<Client> {
-  const authProvider = new CliOAuthProvider(name);
+export async function connectAndSave(
+  url: string,
+  name: string,
+  useNgrok: boolean = false,
+): Promise<Client> {
+  const authProvider = new CliOAuthProvider(name, url, useNgrok);
 
   try {
     return await connectWithAuth(url, authProvider);
   } catch (e) {
-    authProvider.cleanup();
+    await authProvider.cleanup();
     throw e;
   }
 }

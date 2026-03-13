@@ -61,13 +61,18 @@ Once a connection is saved, interact with it using:
   .version("0.1.0");
 
 // --- shared connect handler ---
-async function connectAction(url: string, opts: { name?: string }) {
+async function connectAction(url: string, opts: { name?: string; ngrok?: boolean }) {
   const name = opts.name ?? new URL(url).hostname.split(".")[0] ?? "server";
   console.log(`Connecting to ${url} as "${name}"...`);
 
   try {
-    const client = await connectAndSave(url, name);
-    await addConnection({ name, url, addedAt: new Date().toISOString() });
+    const client = await connectAndSave(url, name, Boolean(opts.ngrok));
+    await addConnection({
+      name,
+      url,
+      addedAt: new Date().toISOString(),
+      useNgrok: Boolean(opts.ngrok),
+    });
 
     const capabilities = client.getServerCapabilities();
     const serverInfo = client.getServerVersion();
@@ -92,6 +97,7 @@ program
   .command("connect <url>")
   .description("Connect to an MCP server and save the connection (alias for connections add)")
   .option("-n, --name <name>", "Friendly name for this connection")
+  .option("--ngrok", "Expose the OAuth callback through ngrok")
   .action(connectAction);
 
 // --- connections command ---
@@ -101,6 +107,7 @@ connections
   .command("add <url>")
   .description("Connect to an MCP server and save the connection")
   .option("-n, --name <name>", "Friendly name for this connection")
+  .option("--ngrok", "Expose the OAuth callback through ngrok")
   .action(connectAction);
 
 connections
@@ -118,6 +125,7 @@ connections
       console.log(`  ${c.name}`);
       console.log(`    URL: ${c.url}`);
       console.log(`    Added: ${c.addedAt}`);
+      if (c.useNgrok) console.log(`    OAuth callback: ngrok`);
       console.log(`    Try:  mcp-to-cli ${c.name} tools list\n`);
     }
     console.log("Usage: mcp-to-cli <connection> <tools|resources|prompts> <command>");

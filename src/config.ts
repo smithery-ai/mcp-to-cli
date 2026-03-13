@@ -9,14 +9,15 @@ export interface StoredConnection {
   name: string;
   url: string;
   addedAt: string;
+  useNgrok?: boolean;
 }
 
 export interface StoredAuth {
-  clientId: string;
+  clientId?: string;
   clientSecret?: string;
-  accessToken: string;
+  accessToken?: string;
   refreshToken?: string;
-  tokenType: string;
+  tokenType?: string;
   expiresAt?: number;
   codeVerifier?: string;
   redirectUri?: string;
