@@ -33,6 +33,7 @@ export class CliOAuthProvider implements OAuthClientProvider {
     public connectionName: string,
     serverUrl: string,
     private useNgrok: boolean = false,
+    private noOpen: boolean = false,
   ) {
     this._callbackPath = createCallbackPath(connectionName, serverUrl);
     if (!this.useNgrok) {
@@ -141,7 +142,6 @@ export class CliOAuthProvider implements OAuthClientProvider {
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    const open = (await import("open")).default;
     await this.prepareRedirectUrl();
 
     // Register a callback route on the shared server and expose the promise.
@@ -159,11 +159,17 @@ export class CliOAuthProvider implements OAuthClientProvider {
       },
     });
 
-    console.log(`\nOpening browser for authorization...`);
-    console.log(`If the browser doesn't open, visit:\n${authorizationUrl.toString()}\n`);
-    console.log(`OAuth callback URL: ${this.redirectUrl.toString()}`);
-    console.log("Waiting for authorization...");
-    await open(authorizationUrl.toString());
+    console.log(`\nOAuth callback URL: ${this.redirectUrl.toString()}`);
+    if (this.noOpen) {
+      console.log(`\nOpen this URL to authorize:\n${authorizationUrl.toString()}\n`);
+      console.log("Waiting for authorization...");
+    } else {
+      const open = (await import("open")).default;
+      console.log(`Opening browser for authorization...`);
+      console.log(`If the browser doesn't open, visit:\n${authorizationUrl.toString()}\n`);
+      console.log("Waiting for authorization...");
+      await open(authorizationUrl.toString());
+    }
 
     // Don't wait here — return immediately so auth() returns 'REDIRECT'.
     // The caller will await authCodePromise separately.

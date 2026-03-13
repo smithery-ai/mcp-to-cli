@@ -72,17 +72,22 @@ Once a connection is saved, interact with it using:
   .version("0.1.0");
 
 // --- shared connect handler ---
-async function connectAction(url: string, opts: { name?: string; ngrok?: boolean }) {
+async function connectAction(
+  url: string,
+  opts: { name?: string; ngrok?: boolean; open?: boolean },
+) {
   const name = opts.name ?? new URL(url).hostname.split(".")[0] ?? "server";
+  const noOpen = opts.open === false;
   console.log(`Connecting to ${url} as "${name}"...`);
 
   try {
-    const client = await connectAndSave(url, name, Boolean(opts.ngrok));
+    const client = await connectAndSave(url, name, Boolean(opts.ngrok), noOpen);
     await addConnection({
       name,
       url,
       addedAt: new Date().toISOString(),
       useNgrok: Boolean(opts.ngrok),
+      noOpen,
     });
 
     const capabilities = client.getServerCapabilities();
@@ -109,6 +114,7 @@ program
   .description("Connect to an MCP server and save the connection (alias for connections add)")
   .option("-n, --name <name>", "Friendly name for this connection")
   .option("--ngrok", "Expose the OAuth callback through ngrok")
+  .option("--no-open", "Print the OAuth URL instead of opening a browser")
   .action(connectAction);
 
 // --- connections command ---
@@ -119,6 +125,7 @@ connections
   .description("Connect to an MCP server and save the connection")
   .option("-n, --name <name>", "Friendly name for this connection")
   .option("--ngrok", "Expose the OAuth callback through ngrok")
+  .option("--no-open", "Print the OAuth URL instead of opening a browser")
   .action(connectAction);
 
 connections
