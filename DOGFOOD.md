@@ -7,51 +7,53 @@
 
 ## Overall Take
 
-The core idea is good. Once the `notion` connection is already present, the CLI can discover tools, inspect schemas, search users, search workspace content, fetch pages, and read MCP resources with very little ceremony.
+This is noticeably better than the last pass. The CLI now explains `tools call`, translates unsupported prompt operations into a normal human message, and compresses schema-validation failures into something readable. Those changes remove a lot of the "protocol leaking through the UX" feeling.
 
-The weak point is the product surface around that capability. The first-run path is brittle, error handling is too raw, and several command shapes are surprising enough that I had to guess and probe instead of being guided by the CLI. As a power-user utility this is close; as a generally pleasant CLI it still feels sharp-edged.
+At this point the biggest remaining issue is output shaping. The CLI is capable, but for high-volume tools like Notion search and fetch it still prints large transport-shaped payloads that are hard to scan in a terminal.
 
 ## What I Ran
 
 ```bash
-npx .
 npx . --help
 npx . connections list
-npx . notion tools list
-npx . notion tools list --offset 5
-npx . notion tools list --offset 10
-npx . notion tools get notion-fetch
-npx . notion tools get notion-search
-npx . notion resources list
-npx . notion resources get notion://docs/enhanced-markdown-spec
-npx . notion resources get notion://docs/view-dsl-spec
+npx . notion tools call --help
 npx . notion prompts list
 npx . notion tools call notion-get-teams --args '{}'
-npx . notion tools call notion-get-users --args '{}'
+npx . notion tools call notion-get-teams --args '{}' --json
+npx . notion tools call notion-search --args '{"query":"","query_type":"internal"}'
 npx . notion tools call notion-search --args '{"query":"ani","query_type":"user"}'
 npx . notion tools call notion-search --args '{"query":"Smithery","query_type":"internal"}'
 npx . notion tools call notion-fetch --args '{"id":"320a0cc7-6127-8022-950b-d7e8d3b20862"}'
 ```
 
-## Findings
+## What Improved
 
-### 1. First run fails before the product even starts
+### 1. Nested help now works
 
-**Severity**: High
+**Status**: Fixed
 
-Running `npx .` in a fresh checkout failed with:
+This command now returns real guidance instead of treating `--help` as a tool name:
 
-```text
-error: Cannot find package 'commander' from '/Users/anirudh/conductor/workspaces/mcp-to-cli/la-paz-v2/src/cli.ts'
+```bash
+npx . notion tools call --help
 ```
 
-I had to run `bun install` manually before the CLI became usable. For a local-dev workflow that is acceptable, but for a dogfood command this is a hard stop. If `npx .` is the intended entrypoint, it should either work out of the box or fail with an explicit setup instruction.
+Current output:
 
-**What I expected**: either a working command or a direct message like "Dependencies missing. Run `bun install`."
+```text
+Usage: mcp-to-cli <name> tools call <tool_name> [--args '{...}']
 
-### 2. `prompts list` leaks a raw MCP protocol error
+Modes:
+  Interactive:  mcp-to-cli <name> tools call <tool>          (prompts for each argument)
+  Scripted:     mcp-to-cli <name> tools call <tool> --args '{"key":"value"}'
+  Raw JSON:     Add --json to get unformatted JSON output
+```
 
-**Severity**: Medium
+This is the single highest-value improvement from the previous pass. It makes the command legible.
+
+### 2. Unsupported prompt support is translated cleanly
+
+**Status**: Fixed
 
 This command:
 
@@ -59,163 +61,110 @@ This command:
 npx . notion prompts list
 ```
 
-returned:
+now returns:
 
 ```text
-MCP error -32601: Method not found
+This server does not support that feature.
 ```
 
-That is technically true, but it is not a product-grade response. The CLI knows the user is trying to list prompts; it should translate unsupported MCP methods into something like:
+That is much better than exposing raw MCP method errors.
 
-```text
-This server does not implement prompts.
-```
+### 3. Validation errors are now user-readable
 
-or
-
-```text
-Prompts are not supported by this connection.
-```
-
-Right now the user has to understand JSON-RPC error codes to know whether they made a mistake or the server simply does not support that feature.
-
-### 3. Subcommand help is broken or at least very misleading
-
-**Severity**: Medium
+**Status**: Fixed
 
 This command:
 
 ```bash
-npx . notion tools call --help
+npx . notion tools call notion-search --args '{"query":"","query_type":"internal"}'
 ```
 
-returned:
+now returns:
 
 ```text
-Tool "--help" not found.
+Invalid arguments: `query`: String must contain at least 1 character(s)
 ```
 
-That makes the interface feel unstable. A normal CLI expectation is that `--help` works at every level. Here it gets consumed as a positional tool name, which means the user cannot discover how `tools call` is supposed to work from the place they most need help.
+That is still accurate, but now it reads like a CLI message rather than a schema dump.
 
-### 4. `tools call` defaults to an interactive prompt, but the interaction model is opaque
+## Remaining Findings
+
+### 1. Large search results are still too raw for terminal use
 
 **Severity**: Medium
 
-Running:
-
-```bash
-npx . notion tools call notion-get-teams
-```
-
-dropped into an interactive prompt for optional arguments. That is fine in principle, but the CLI gives no up-front clue that this will happen, and there is no easy `--help` path for that command.
-
-This becomes a usability issue because the product is trying to serve both:
-
-- humans using the CLI interactively
-- users who want to script tool calls with `--args`
-
-The CLI supports both modes, but it does not explain the contract clearly enough.
-
-### 5. Validation errors are accurate but not user-oriented
-
-**Severity**: Medium
-
-This command:
-
-```bash
-npx . notion tools call notion-search --args '{"query":""}'
-```
-
-returned a full schema-validation payload:
-
-```text
-Invalid arguments for tool notion-search: [
-  {
-    "code": "too_small",
-    "minimum": 1,
-    "type": "string",
-    "inclusive": true,
-    "exact": false,
-    "message": "String must contain at least 1 character(s)",
-    "path": [
-      "query"
-    ]
-  }
-]
-```
-
-The detail is useful, but the UX is too low-level by default. A cleaner top line would help:
-
-```text
-`query` must be a non-empty string.
-```
-
-Then optionally show the structured validation block behind `--verbose`.
-
-### 6. Large result sets are dumped raw with no shaping
-
-**Severity**: Medium
-
-This command:
+This command works:
 
 ```bash
 npx . notion tools call notion-search --args '{"query":"Smithery","query_type":"internal"}'
 ```
 
-returned a very large JSON blob with dozens of results, long highlight excerpts, and enough output that the terminal view became hard to scan. It works, but it does not feel designed.
+but the output is still a very large JSON object with long highlight strings and many results in one block. It is technically correct, but it is not pleasant to scan interactively.
 
-The current behavior is fine for piping, but interactive terminal usage needs a presentation layer:
+What I want here is a human-first default such as:
 
-- cap results by default
-- show a concise table/list view first
-- add `--json` for raw output
-- maybe add `--limit`
+- numbered results
+- title, type, timestamp, short snippet
+- a default result cap
+- `--json` or `--raw` for the full payload
 
-Right now the command technically succeeds while still making the human do too much parsing.
+Right now the CLI gives me the transport, not a terminal view.
 
-### 7. Output formats are inconsistent across adjacent flows
+### 2. `fetch` still returns a giant JSON wrapper around a giant string payload
+
+**Severity**: Medium
+
+This command succeeds:
+
+```bash
+npx . notion tools call notion-fetch --args '{"id":"320a0cc7-6127-8022-950b-d7e8d3b20862"}'
+```
+
+but the response shape is still awkward for humans:
+
+- outer JSON object
+- `text` field
+- inside that field, a large Notion-flavored markdown/XML document
+
+That may be the right raw representation, but the CLI should probably offer a friendlier rendered mode by default and reserve the current shape for `--json`.
+
+### 3. `--json` exists now, but the default output mode still needs stronger opinions
 
 **Severity**: Low
 
-Different commands return noticeably different shapes:
+It is good that this now works:
 
-- `tools list` is a curated human-readable list
-- `tools get` is a readable schema dump
-- `tools call` returns raw JSON blobs
-- `resources get` returns raw text payloads
-- `fetch` returns JSON whose main content is a giant string containing Notion-flavored markdown/XML
+```bash
+npx . notion tools call notion-get-teams --args '{}' --json
+```
 
-That inconsistency is understandable because MCP payloads vary, but the CLI needs a stronger opinion about formatting. Today it feels like each path exposes a different abstraction layer.
+That said, the presence of `--json` makes the current default output feel even more unfinished. If there is an explicit raw mode, the default mode should be more curated than it is today.
 
-### 8. The happy path is real once you already know the shape
+### 4. The happy path is solid
 
 **Severity**: Low, positive
 
-After I got past the rough edges, the CLI did useful work quickly:
+The Notion connection is genuinely useful from the CLI:
 
-- `connections list` clearly showed the saved `notion` connection
-- `tools list` paginated successfully with `--offset`
-- `tools get notion-fetch` and `tools get notion-search` were useful for schema discovery
-- `notion-get-teams` and `notion-get-users` worked cleanly with `--args '{}'`
-- user search worked well with `{"query":"ani","query_type":"user"}`
-- internal search found real workspace pages
-- `notion-fetch` successfully fetched a page by UUID
-- resources could be read directly by URI
+- `connections list` is clear
+- `tools call --help` now teaches the command shape
+- read-only calls like `notion-get-teams` work immediately
+- user search works
+- workspace search works
+- page fetch works
 
-So the underlying foundation is solid enough that I would keep using it. The main problem is polish and guidance, not fundamental capability.
+So my view now is that the product is crossing from "sharp prototype" into "usable tool." The remaining work is mostly around terminal ergonomics, not core functionality.
 
-## Product Suggestions
+## Suggestions
 
-1. Add first-run dependency guidance if local packages are missing.
-2. Normalize unsupported-feature errors like `Method not found` into product language.
-3. Make `--help` work consistently at every nesting level.
-4. Document and surface the dual mode for `tools call`: interactive prompt vs `--args`.
-5. Add a compact default renderer for large tool outputs, with `--json` as the escape hatch.
-6. Add small affordances for interactive usage: `--limit`, `--verbose`, maybe `--raw`.
-7. Consider a more opinionated fetch/search UX for common MCP patterns instead of always returning transport-shaped output.
+1. Keep `--json` as the escape hatch and make the default output mode more human-oriented.
+2. Add result limiting and summary views for search-heavy tools.
+3. Add a rendered mode for common MCP result types like page fetches.
+4. Consider a consistent output contract:
+   human view by default, raw transport with `--json`.
 
 ## Bottom Line
 
-I like the direction. It already proves that "remote MCP from a CLI" is useful, and the Notion integration is capable enough to inspect a real workspace immediately.
+I would use this now. The command surface makes a lot more sense than it did before, and the Notion workflow is real.
 
-What holds it back is not missing power. It is that the CLI still speaks too much in backend/protocol terms and not enough in user-facing terms. Tightening first-run behavior, help, error translation, and output shaping would move it from "works if you are determined" to "pleasant tool I would actually recommend."
+The next improvement I would prioritize is not more capability. It is better terminal presentation for large MCP responses, because that is now the main thing making the product feel heavier than it should.
