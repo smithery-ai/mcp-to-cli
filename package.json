@@ -1,0 +1,27 @@
+{
+  "name": "mcp-to-cli",
+  "version": "0.1.0",
+  "description": "Connect to remote MCP servers from the command line",
+  "module": "src/cli.ts",
+  "type": "module",
+  "bin": {
+    "mcp-to-cli": "./src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun src/cli.ts",
+    "dev": "bun --watch src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.3.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "commander": "^14.0.3",
+    "inquirer": "^13.3.0",
+    "open": "^11.0.0"
+  }
+}
