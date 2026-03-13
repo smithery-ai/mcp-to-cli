@@ -6,10 +6,7 @@ import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import { CliOAuthProvider } from "./auth.ts";
 import { getConnection } from "./config.ts";
 
-async function connectWithAuth(
-  url: string,
-  authProvider: CliOAuthProvider
-): Promise<Client> {
+async function connectWithAuth(url: string, authProvider: CliOAuthProvider): Promise<Client> {
   const client = new Client({ name: "mcp-to-cli", version: "1.0.0" });
   const serverUrl = new URL(url);
 

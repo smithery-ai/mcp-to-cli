@@ -1,5 +1,10 @@
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { OAuthClientInformation, OAuthClientInformationFull, OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type {
+  OAuthClientInformation,
+  OAuthClientInformationFull,
+  OAuthClientMetadata,
+  OAuthTokens,
+} from "@modelcontextprotocol/sdk/shared/auth.js";
 import { getStoredAuth, saveAuth, type StoredAuth } from "./config.ts";
 
 export class CliOAuthProvider implements OAuthClientProvider {
@@ -14,7 +19,7 @@ export class CliOAuthProvider implements OAuthClientProvider {
 
   constructor(
     public connectionName: string,
-    public callbackPort: number = 8912
+    public callbackPort: number = 8912,
   ) {}
 
   get redirectUrl(): URL {
@@ -82,8 +87,8 @@ export class CliOAuthProvider implements OAuthClientProvider {
     this.authCodePromise = new Promise<string>((resolve) => {
       this._authResolve = resolve;
     });
+    const authResolve = this._authResolve;
 
-    const self = this;
     const server = Bun.serve({
       port: this.callbackPort,
       routes: {
@@ -91,22 +96,22 @@ export class CliOAuthProvider implements OAuthClientProvider {
           GET(req) {
             const url = new URL(req.url);
             const code = url.searchParams.get("code");
-            if (code && self._authResolve) {
-              self._authResolve(code);
+            if (code && authResolve) {
+              authResolve(code);
               return new Response(
                 "<html><body><h1>Authorization successful!</h1><p>You can close this tab and return to the terminal.</p></body></html>",
-                { headers: { "Content-Type": "text/html" } }
+                { headers: { "Content-Type": "text/html" } },
               );
             }
             const error = url.searchParams.get("error");
             return new Response(
               `<html><body><h1>Authorization failed</h1><p>${error || "Missing authorization code"}</p></body></html>`,
-              { status: 400, headers: { "Content-Type": "text/html" } }
+              { status: 400, headers: { "Content-Type": "text/html" } },
             );
           },
         },
       },
-      fetch(req) {
+      fetch() {
         return new Response("Not found", { status: 404 });
       },
     });
