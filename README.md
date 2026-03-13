@@ -63,6 +63,13 @@ bun start --help
 mcp-to-cli connect https://example.com/mcp --name example
 ```
 
+You can also pass a bare service name instead of a full URL. The CLI resolves it to `https://<name>.run.tools` (Smithery):
+
+```bash
+mcp-to-cli connect linear        # → https://linear.run.tools
+mcp-to-cli connect notion        # → https://notion.run.tools
+```
+
 Print the OAuth URL instead of opening a browser:
 
 ```bash

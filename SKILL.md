@@ -23,6 +23,22 @@ bun install
 - A reachable MCP server URL
 - `NGROK_AUTHTOKEN` in your environment when using `--ngrok`
 
+## URL Shortcuts
+
+If you pass a bare name (no `://` or `.`), the CLI resolves it to `https://<name>.run.tools` (Smithery):
+
+```bash
+# These are equivalent:
+mcp-to-cli connect linear
+mcp-to-cli connect https://linear.run.tools
+
+# Works for any service on Smithery:
+mcp-to-cli connect notion    # → https://notion.run.tools
+mcp-to-cli connect gmail     # → https://gmail.run.tools
+```
+
+When a shortcut is used, the CLI logs `Defaulting to Smithery URL: <resolved-url>`.
+
 ## Quick Start
 
 ```bash
