@@ -65,6 +65,13 @@ async function connectAction(
   url: string,
   opts: { name?: string; ngrok?: boolean; open?: boolean },
 ) {
+  // If it's a bare name (not a URL), resolve to Smithery's run.tools domain
+  if (!url.includes("://") && !url.includes(".")) {
+    const resolved = `https://${url.toLowerCase()}.run.tools`;
+    console.log(`Defaulting to Smithery URL: ${resolved}`);
+    url = resolved;
+  }
+
   const name = opts.name ?? new URL(url).hostname.split(".")[0] ?? "server";
   const noOpen = opts.open === false;
   console.log(`Connecting to ${url} as "${name}"...`);
