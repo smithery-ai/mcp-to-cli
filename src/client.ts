@@ -70,7 +70,12 @@ export async function createClient(name: string): Promise<Client> {
     throw new Error(`Connection "${name}" not found. Run: mcp-to-cli connect <url> --name ${name}`);
   }
 
-  const authProvider = new CliOAuthProvider(name, connection.url, connection.useNgrok);
+  const authProvider = new CliOAuthProvider(
+    name,
+    connection.url,
+    connection.useNgrok,
+    connection.noOpen,
+  );
 
   try {
     return await connectWithAuth(connection.url, authProvider);
@@ -84,8 +89,9 @@ export async function connectAndSave(
   url: string,
   name: string,
   useNgrok: boolean = false,
+  noOpen: boolean = false,
 ): Promise<Client> {
-  const authProvider = new CliOAuthProvider(name, url, useNgrok);
+  const authProvider = new CliOAuthProvider(name, url, useNgrok, noOpen);
 
   try {
     return await connectWithAuth(url, authProvider);
