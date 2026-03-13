@@ -14,6 +14,7 @@
 
 - Bun 1.3+
 - A reachable MCP server URL
+- `NGROK_AUTHTOKEN` in your environment when using `--ngrok`
 
 ## Install
 
@@ -60,6 +61,12 @@ bun start --help
 
 ```bash
 mcp-to-cli connect https://example.com/mcp --name example
+```
+
+Use ngrok for OAuth callbacks:
+
+```bash
+mcp-to-cli connect https://example.com/mcp --name example --ngrok
 ```
 
 Equivalent command:
@@ -167,8 +174,9 @@ mcp-to-cli example prompts get summarize_release
 For servers that require OAuth:
 
 1. The CLI opens the system browser.
-2. It listens locally on `http://localhost:8912/callback`.
-3. After approval, tokens are stored for the saved connection and reused on future requests.
+2. It listens on a shared local callback server at `http://localhost:8912/<connection>/callback`.
+3. If the connection was created with `--ngrok`, the redirect URI uses the ngrok URL for that same callback path instead of localhost.
+4. After approval, tokens are stored for the saved connection and reused on future requests.
 
 ## Local data
 

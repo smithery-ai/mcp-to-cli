@@ -6,12 +6,24 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { getStoredAuth, saveAuth, type StoredAuth } from "./config.ts";
+import { createCallbackPath, getLocalCallbackBaseUrl, registerCallback } from "./callback.ts";
+
+type NgrokListener = {
+  close(): Promise<void>;
+  url(): string | null;
+};
 
 export class CliOAuthProvider implements OAuthClientProvider {
   private _tokens: OAuthTokens | undefined;
   private _clientInfo: OAuthClientInformationFull | undefined;
   private _codeVerifier: string = "";
-  private _serverForCleanup: ReturnType<typeof Bun.serve> | null = null;
+  private _authCleanup: (() => void) | null = null;
+  private _authReject: ((error: Error) => void) | null = null;
+  private _ngrokListener: NgrokListener | null = null;
+  private _lastRedirectUri: string | null = null;
+  private _ngrokUrl: string | null = null;
+  private _prepared = false;
+  private readonly _callbackPath: string;
 
   /** Resolves with the auth code when the callback is received */
   authCodePromise: Promise<string> | null = null;
@@ -19,11 +31,21 @@ export class CliOAuthProvider implements OAuthClientProvider {
 
   constructor(
     public connectionName: string,
-    public callbackPort: number = 8912,
-  ) {}
+    serverUrl: string,
+    private useNgrok: boolean = false,
+  ) {
+    this._callbackPath = createCallbackPath(connectionName, serverUrl);
+    if (!this.useNgrok) {
+      this._lastRedirectUri = new URL(this._callbackPath, getLocalCallbackBaseUrl()).toString();
+    }
+  }
 
   get redirectUrl(): URL {
-    return new URL(`http://localhost:${this.callbackPort}/callback`);
+    if (!this._lastRedirectUri) {
+      throw new Error("OAuth redirect URL requested before the callback was initialized.");
+    }
+
+    return new URL(this._lastRedirectUri);
   }
 
   get clientMetadata(): OAuthClientMetadata {
@@ -37,9 +59,19 @@ export class CliOAuthProvider implements OAuthClientProvider {
   }
 
   async clientInformation(): Promise<OAuthClientInformation | undefined> {
+    if (this.useNgrok && !this._prepared) {
+      await this.prepareRedirectUrl();
+    }
     if (this._clientInfo) return this._clientInfo;
+
     const stored = await getStoredAuth(this.connectionName);
-    if (stored?.clientId) {
+    if (stored?.redirectUri && !this.useNgrok) {
+      this._lastRedirectUri = stored.redirectUri;
+    }
+    if (
+      stored?.clientId &&
+      (!stored.redirectUri || stored.redirectUri === this.redirectUrl.toString())
+    ) {
       return { client_id: stored.clientId, client_secret: stored.clientSecret };
     }
     return undefined;
@@ -52,6 +84,7 @@ export class CliOAuthProvider implements OAuthClientProvider {
       ...existing,
       clientId: info.client_id,
       clientSecret: info.client_secret,
+      redirectUri: this.redirectUrl.toString(),
     });
   }
 
@@ -77,48 +110,58 @@ export class CliOAuthProvider implements OAuthClientProvider {
       tokenType: tokens.token_type,
       refreshToken: tokens.refresh_token,
       expiresAt: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : undefined,
+      redirectUri: this.redirectUrl.toString(),
     });
+  }
+
+  async prepareRedirectUrl(): Promise<void> {
+    if (this._prepared) return;
+    this._prepared = true;
+
+    if (!this.useNgrok) return;
+
+    try {
+      const ngrok = await import("@ngrok/ngrok");
+      this._ngrokListener = await ngrok.forward({
+        addr: getLocalCallbackBaseUrl().replace("http://", ""),
+        authtoken_from_env: true,
+      });
+      this._ngrokUrl = this._ngrokListener.url();
+      if (!this._ngrokUrl) {
+        throw new Error("ngrok did not return a public URL.");
+      }
+      this._lastRedirectUri = new URL(this._callbackPath, this._ngrokUrl).toString();
+    } catch (error) {
+      this._prepared = false;
+      this._ngrokUrl = null;
+      throw new Error(
+        `Failed to start ngrok. Set NGROK_AUTHTOKEN and try again. ${(error as Error).message}`,
+      );
+    }
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     const open = (await import("open")).default;
+    await this.prepareRedirectUrl();
 
-    // Start local callback server and expose the promise
-    this.authCodePromise = new Promise<string>((resolve) => {
+    // Register a callback route on the shared server and expose the promise.
+    this.authCodePromise = new Promise<string>((resolve, reject) => {
       this._authResolve = resolve;
+      this._authReject = reject;
     });
-    const authResolve = this._authResolve;
 
-    const server = Bun.serve({
-      port: this.callbackPort,
-      routes: {
-        "/callback": {
-          GET(req) {
-            const url = new URL(req.url);
-            const code = url.searchParams.get("code");
-            if (code && authResolve) {
-              authResolve(code);
-              return new Response(
-                "<html><body><h1>Authorization successful!</h1><p>You can close this tab and return to the terminal.</p></body></html>",
-                { headers: { "Content-Type": "text/html" } },
-              );
-            }
-            const error = url.searchParams.get("error");
-            return new Response(
-              `<html><body><h1>Authorization failed</h1><p>${error || "Missing authorization code"}</p></body></html>`,
-              { status: 400, headers: { "Content-Type": "text/html" } },
-            );
-          },
-        },
+    this._authCleanup = registerCallback(this._callbackPath, {
+      reject: (error) => {
+        this._authReject?.(error);
       },
-      fetch() {
-        return new Response("Not found", { status: 404 });
+      resolve: (code) => {
+        this._authResolve?.(code);
       },
     });
-    this._serverForCleanup = server;
 
     console.log(`\nOpening browser for authorization...`);
     console.log(`If the browser doesn't open, visit:\n${authorizationUrl.toString()}\n`);
+    console.log(`OAuth callback URL: ${this.redirectUrl.toString()}`);
     console.log("Waiting for authorization...");
     await open(authorizationUrl.toString());
 
@@ -134,10 +177,19 @@ export class CliOAuthProvider implements OAuthClientProvider {
     return this._codeVerifier;
   }
 
-  cleanup() {
-    if (this._serverForCleanup) {
-      this._serverForCleanup.stop();
-      this._serverForCleanup = null;
+  async cleanup() {
+    this._authCleanup?.();
+    this._authCleanup = null;
+    this._authResolve = null;
+    this._authReject = null;
+    this.authCodePromise = null;
+
+    if (this._ngrokListener) {
+      await this._ngrokListener.close();
+      this._ngrokListener = null;
     }
+
+    this._ngrokUrl = null;
+    this._prepared = false;
   }
 }
