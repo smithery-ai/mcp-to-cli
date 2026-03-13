@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { input } from "@inquirer/prompts";
+import type { ZodError } from "zod/v4";
 import { addConnection, getConnection, getConnections, removeConnection } from "./config.ts";
 import { connectAndSave, createClient } from "./client.ts";
+import { getToolByName, validateToolArguments } from "./tools.ts";
 
 const program = new Command();
 
@@ -36,6 +38,15 @@ function formatValidationErrors(raw: string): string {
   } catch {
     return raw;
   }
+}
+
+function formatZodError(error: ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const field = issue.path.length ? `\`${issue.path.map(String).join(".")}\`` : "input";
+      return `${field}: ${issue.message}`;
+    })
+    .join("\n");
 }
 
 /** Detect --help / -h anywhere in args for dynamic subcommands */
@@ -284,8 +295,7 @@ async function handleTools(
         console.error("Usage: mcp-to-cli <name> tools get <tool_name>");
         process.exit(1);
       }
-      const { tools } = await client.listTools();
-      const tool = tools.find((t: any) => t.name === toolName);
+      const tool = await getToolByName(client, toolName);
       if (!tool) {
         console.error(`Tool "${toolName}" not found.`);
         process.exit(1);
@@ -312,10 +322,15 @@ async function handleTools(
       }
 
       const rawJson = extra.includes("--json");
+      const tool = await getToolByName(client, toolName);
+      if (!tool) {
+        console.error(`Tool "${toolName}" not found.`);
+        process.exit(1);
+      }
 
       // Check for --args flag
       const argsIdx = extra.indexOf("--args");
-      let toolArgs: Record<string, any> = {};
+      let toolArgs: Record<string, unknown> = {};
       const rawArgs = extra[argsIdx + 1];
 
       if (argsIdx >= 0 && rawArgs) {
@@ -327,13 +342,6 @@ async function handleTools(
         }
       } else {
         // Interactive mode: fetch schema and prompt for each field
-        const { tools } = await client.listTools();
-        const tool = tools.find((t: any) => t.name === toolName);
-        if (!tool) {
-          console.error(`Tool "${toolName}" not found.`);
-          process.exit(1);
-        }
-
         const schema = tool.inputSchema;
         if (schema?.properties) {
           console.log(
@@ -368,6 +376,18 @@ async function handleTools(
             }
           }
         }
+      }
+
+      try {
+        const validation = validateToolArguments(tool, toolArgs);
+        if (!validation.success) {
+          console.error(`\nInvalid arguments:\n${formatZodError(validation.error)}`);
+          process.exit(1);
+        }
+        toolArgs = validation.data as Record<string, unknown>;
+      } catch (e) {
+        console.error(`\n${(e as Error).message}`);
+        process.exit(1);
       }
 
       console.log(`\nCalling ${toolName}...`);

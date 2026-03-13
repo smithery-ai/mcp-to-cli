@@ -8,6 +8,7 @@
 - Stores named connections locally so you can address a server by name.
 - Supports OAuth browser authorization flows for protected servers.
 - Lists tool, resource, and prompt capabilities exposed by a server.
+- Validates tool arguments locally against each tool's input schema before sending the call.
 - Calls tools interactively or with JSON arguments from the command line.
 
 ## Requirements
