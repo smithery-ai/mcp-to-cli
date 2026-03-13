@@ -6,6 +6,43 @@ import { connectAndSave, createClient } from "./client.ts";
 
 const program = new Command();
 
+// --- error helpers ---
+
+/** Translate MCP JSON-RPC errors into user-friendly messages */
+function formatMcpError(e: any): string {
+  const msg = e?.message || String(e);
+  // MCP "Method not found" → friendly message
+  if (msg.includes("-32601") || msg.toLowerCase().includes("method not found")) {
+    return "This server does not support that feature.";
+  }
+  // MCP "Invalid params"
+  if (msg.includes("-32602") || msg.toLowerCase().includes("invalid params")) {
+    return "Invalid parameters sent to the server.";
+  }
+  return msg;
+}
+
+/** Turn Zod-style validation errors into a human-readable summary */
+function formatValidationErrors(raw: string): string {
+  try {
+    const errors = JSON.parse(raw);
+    if (!Array.isArray(errors)) return raw;
+    return errors
+      .map((e: any) => {
+        const field = e.path?.length ? `\`${e.path.join(".")}\`` : "input";
+        return `${field}: ${e.message}`;
+      })
+      .join("\n");
+  } catch {
+    return raw;
+  }
+}
+
+/** Detect --help / -h anywhere in args for dynamic subcommands */
+function wantsHelp(args: string[]): boolean {
+  return args.includes("--help") || args.includes("-h");
+}
+
 program
   .name("mcp-to-cli")
   .description(
@@ -114,17 +151,22 @@ async function handleServerCommand(serverName: string, args: string[]) {
   const action = args[1]; // list, get, call
   const extra = args.slice(2); // tool name, etc.
 
-  if (!category) {
+  const validCategories = ["tools", "resources", "prompts"];
+  if (!category || (!validCategories.includes(category) && wantsHelp(args))) {
     console.log(`${serverName} (${conn.url})\n`);
     console.log(`Usage: mcp-to-cli ${serverName} <command>\n`);
     console.log("Commands:\n");
-    console.log(`  tools list                List available tools`);
-    console.log(`  tools get <tool>          Show a tool's input schema`);
-    console.log(`  tools call <tool>         Call a tool (interactive or --args '{...}')`);
-    console.log(`  resources list            List available resources`);
-    console.log(`  resources get <uri>       Read a resource by URI`);
-    console.log(`  prompts list              List available prompts`);
-    console.log(`  prompts get <prompt>      Render a prompt (interactive args)`);
+    console.log(`  tools list                         List available tools`);
+    console.log(`  tools get <tool>                   Show a tool's input schema`);
+    console.log(`  tools call <tool> [--args '{...}'] Call a tool`);
+    console.log(`  resources list                     List available resources`);
+    console.log(`  resources get <uri>                Read a resource by URI`);
+    console.log(`  prompts list                       List available prompts`);
+    console.log(`  prompts get <prompt>               Render a prompt (interactive args)`);
+    console.log();
+    console.log("Options:\n");
+    console.log("  --help, -h    Show help for any command");
+    console.log("  --json        Output raw JSON (for tools call)");
     return;
   }
 
@@ -151,6 +193,18 @@ async function handleServerCommand(serverName: string, args: string[]) {
 }
 
 async function handleTools(client: any, serverName: string, action: string | undefined, extra: string[]) {
+  // Handle --help at the tools level (only if no valid action given)
+  if (!action || wantsHelp([action])) {
+    console.log(`Usage: mcp-to-cli ${serverName} tools <command>\n`);
+    console.log("Commands:\n");
+    console.log("  list [--offset N] [--limit N] [--full-description]   List available tools");
+    console.log("  get <tool>                                           Show a tool's input schema");
+    console.log("  call <tool> [--args '{...}'] [--json]                Call a tool");
+    console.log();
+    console.log("When calling a tool without --args, you will be prompted interactively for each argument.");
+    return;
+  }
+
   switch (action) {
     case "list":
     case "ls": {
@@ -196,7 +250,7 @@ async function handleTools(client: any, serverName: string, action: string | und
       break;
     }
     case "get": {
-      const toolName = extra[0];
+      const toolName = extra.filter(a => !a.startsWith("-"))[0];
       if (!toolName) {
         console.error("Usage: mcp-to-cli <name> tools get <tool_name>");
         process.exit(1);
@@ -214,11 +268,17 @@ async function handleTools(client: any, serverName: string, action: string | und
       break;
     }
     case "call": {
-      const toolName = extra[0];
+      const toolName = extra.filter(a => !a.startsWith("-"))[0];
       if (!toolName) {
-        console.error("Usage: mcp-to-cli <name> tools call <tool_name> [--args '{...}']");
+        console.error("Usage: mcp-to-cli <name> tools call <tool_name> [--args '{...}']\n");
+        console.error("Modes:");
+        console.error("  Interactive:  mcp-to-cli <name> tools call <tool>          (prompts for each argument)");
+        console.error("  Scripted:     mcp-to-cli <name> tools call <tool> --args '{\"key\":\"value\"}'");
+        console.error("  Raw JSON:     Add --json to get unformatted JSON output");
         process.exit(1);
       }
+
+      const rawJson = extra.includes("--json");
 
       // Check for --args flag
       const argsIdx = extra.indexOf("--args");
@@ -242,7 +302,7 @@ async function handleTools(client: any, serverName: string, action: string | und
 
         const schema = tool.inputSchema;
         if (schema?.properties) {
-          console.log(`\nFill in arguments for "${toolName}":\n`);
+          console.log(`\nFill in arguments for "${toolName}" (press Enter to skip optional fields):\n`);
           for (const [key, prop] of Object.entries(schema.properties) as [string, any][]) {
             const required = schema.required?.includes(key);
             const desc = prop.description ? ` (${prop.description})` : "";
@@ -275,25 +335,82 @@ async function handleTools(client: any, serverName: string, action: string | und
       }
 
       console.log(`\nCalling ${toolName}...`);
-      const result = await client.callTool({ name: toolName, arguments: toolArgs });
+      let result: any;
+      try {
+        result = await client.callTool({ name: toolName, arguments: toolArgs });
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        // Check for validation errors (common pattern: "Invalid arguments for tool ...")
+        const validationMatch = msg.match(/Invalid arguments for tool [^:]+:\s*([\s\S]+)/);
+        if (validationMatch) {
+          console.error(`\nInvalid arguments: ${formatValidationErrors(validationMatch[1].trim())}`);
+        } else {
+          console.error(`\n${formatMcpError(e)}`);
+        }
+        process.exit(1);
+      }
 
       if (result.isError) {
         console.error("\nTool returned an error:");
-      } else {
-        console.log("\nResult:");
+        for (const content of result.content as any[]) {
+          if (content.type === "text") {
+            console.error(content.text);
+          } else {
+            console.error(JSON.stringify(content, null, 2));
+          }
+        }
+        process.exit(1);
       }
 
+      // --json: dump raw result
+      if (rawJson) {
+        console.log(JSON.stringify(result.content, null, 2));
+        break;
+      }
+
+      // Default: formatted output with truncation for large payloads
+      const MAX_OUTPUT_LINES = 80;
+      let totalLines = 0;
+      let truncated = false;
+
+      console.log();
       for (const content of result.content as any[]) {
         if (content.type === "text") {
-          console.log(content.text);
+          const lines = content.text.split("\n");
+          for (const line of lines) {
+            if (totalLines >= MAX_OUTPUT_LINES) {
+              truncated = true;
+              break;
+            }
+            console.log(line);
+            totalLines++;
+          }
         } else if (content.type === "image") {
           console.log(`[Image: ${content.mimeType}]`);
+          totalLines++;
         } else if (content.type === "resource") {
           console.log(`[Resource: ${content.resource?.uri}]`);
-          if (content.resource?.text) console.log(content.resource.text);
+          totalLines++;
+          if (content.resource?.text) {
+            const lines = content.resource.text.split("\n");
+            for (const line of lines) {
+              if (totalLines >= MAX_OUTPUT_LINES) {
+                truncated = true;
+                break;
+              }
+              console.log(line);
+              totalLines++;
+            }
+          }
         } else {
           console.log(JSON.stringify(content, null, 2));
+          totalLines++;
         }
+        if (truncated) break;
+      }
+
+      if (truncated) {
+        console.log(`\n... output truncated (${MAX_OUTPUT_LINES} lines shown). Use --json for full output.`);
       }
       break;
     }
@@ -303,36 +420,54 @@ async function handleTools(client: any, serverName: string, action: string | und
 }
 
 async function handleResources(client: any, serverName: string, action: string | undefined, extra: string[]) {
+  if (!action || wantsHelp([action])) {
+    console.log(`Usage: mcp-to-cli ${serverName} resources <command>\n`);
+    console.log("Commands:\n");
+    console.log("  list            List available resources");
+    console.log("  get <uri>       Read a resource by URI");
+    return;
+  }
+
   switch (action) {
     case "list":
     case "ls": {
-      const { resources } = await client.listResources();
-      if (resources.length === 0) {
-        console.log("No resources available.");
-        return;
-      }
-      console.log(`Resources (${resources.length}):\n`);
-      for (const r of resources) {
-        console.log(`  ${r.name} (${r.uri})`);
-        if (r.description) console.log(`    ${r.description}`);
-        if (r.mimeType) console.log(`    Type: ${r.mimeType}`);
+      try {
+        const { resources } = await client.listResources();
+        if (resources.length === 0) {
+          console.log("No resources available.");
+          return;
+        }
+        console.log(`Resources (${resources.length}):\n`);
+        for (const r of resources) {
+          console.log(`  ${r.name} (${r.uri})`);
+          if (r.description) console.log(`    ${r.description}`);
+          if (r.mimeType) console.log(`    Type: ${r.mimeType}`);
+        }
+      } catch (e: any) {
+        console.error(formatMcpError(e));
+        process.exit(1);
       }
       break;
     }
     case "get":
     case "read": {
-      const uri = extra[0];
+      const uri = extra.filter(a => !a.startsWith("-"))[0];
       if (!uri) {
         console.error("Usage: mcp-to-cli <name> resources get <uri>");
         process.exit(1);
       }
-      const { contents } = await client.readResource({ uri });
-      for (const content of contents) {
-        if (content.text) {
-          console.log(content.text);
-        } else if (content.blob) {
-          console.log(`[Binary data: ${content.mimeType || "unknown type"}]`);
+      try {
+        const { contents } = await client.readResource({ uri });
+        for (const content of contents) {
+          if (content.text) {
+            console.log(content.text);
+          } else if (content.blob) {
+            console.log(`[Binary data: ${content.mimeType || "unknown type"}]`);
+          }
         }
+      } catch (e: any) {
+        console.error(formatMcpError(e));
+        process.exit(1);
       }
       break;
     }
@@ -342,63 +477,81 @@ async function handleResources(client: any, serverName: string, action: string |
 }
 
 async function handlePrompts(client: any, serverName: string, action: string | undefined, extra: string[]) {
+  if (!action || wantsHelp([action])) {
+    console.log(`Usage: mcp-to-cli ${serverName} prompts <command>\n`);
+    console.log("Commands:\n");
+    console.log("  list              List available prompts");
+    console.log("  get <prompt>      Render a prompt (interactive args)");
+    return;
+  }
+
   switch (action) {
     case "list":
     case "ls": {
-      const { prompts } = await client.listPrompts();
-      if (prompts.length === 0) {
-        console.log("No prompts available.");
-        return;
-      }
-      console.log(`Prompts (${prompts.length}):\n`);
-      for (const p of prompts) {
-        console.log(`  ${p.name}`);
-        if (p.description) console.log(`    ${p.description}`);
-        if (p.arguments?.length) {
-          for (const arg of p.arguments) {
-            console.log(`    - ${arg.name}${arg.required ? " *" : ""}: ${arg.description || ""}`);
+      try {
+        const { prompts } = await client.listPrompts();
+        if (prompts.length === 0) {
+          console.log("No prompts available.");
+          return;
+        }
+        console.log(`Prompts (${prompts.length}):\n`);
+        for (const p of prompts) {
+          console.log(`  ${p.name}`);
+          if (p.description) console.log(`    ${p.description}`);
+          if (p.arguments?.length) {
+            for (const arg of p.arguments) {
+              console.log(`    - ${arg.name}${arg.required ? " *" : ""}: ${arg.description || ""}`);
+            }
           }
         }
+      } catch (e: any) {
+        console.error(formatMcpError(e));
+        process.exit(1);
       }
       break;
     }
     case "get": {
-      const promptName = extra[0];
+      const promptName = extra.filter(a => !a.startsWith("-"))[0];
       if (!promptName) {
         console.error("Usage: mcp-to-cli <name> prompts get <prompt_name>");
         process.exit(1);
       }
 
-      // Get prompt info for arguments
-      const { prompts } = await client.listPrompts();
-      const promptDef = prompts.find((p: any) => p.name === promptName);
-      if (!promptDef) {
-        console.error(`Prompt "${promptName}" not found.`);
+      try {
+        // Get prompt info for arguments
+        const { prompts } = await client.listPrompts();
+        const promptDef = prompts.find((p: any) => p.name === promptName);
+        if (!promptDef) {
+          console.error(`Prompt "${promptName}" not found.`);
+          process.exit(1);
+        }
+
+        const promptArgs: Record<string, string> = {};
+        if (promptDef.arguments?.length) {
+          console.log(`\nFill in arguments for prompt "${promptName}":\n`);
+          for (const arg of promptDef.arguments) {
+            const label = `${arg.name}${arg.description ? ` (${arg.description})` : ""}${arg.required ? " *" : ""}`;
+            const value = await input({ message: label });
+            if (value !== "") promptArgs[arg.name] = value;
+          }
+        }
+
+        const { messages } = await client.getPrompt({ name: promptName, arguments: promptArgs });
+        console.log("\nPrompt messages:\n");
+        for (const msg of messages) {
+          console.log(`[${msg.role}]`);
+          if (typeof msg.content === "string") {
+            console.log(msg.content);
+          } else if (msg.content?.type === "text") {
+            console.log(msg.content.text);
+          } else {
+            console.log(JSON.stringify(msg.content, null, 2));
+          }
+          console.log();
+        }
+      } catch (e: any) {
+        console.error(formatMcpError(e));
         process.exit(1);
-      }
-
-      const promptArgs: Record<string, string> = {};
-      if (promptDef.arguments?.length) {
-        console.log(`\nFill in arguments for prompt "${promptName}":\n`);
-        for (const arg of promptDef.arguments) {
-          const label = `${arg.name}${arg.description ? ` (${arg.description})` : ""}${arg.required ? " *" : ""}`;
-          const value = await input({ message: label });
-          if (value !== "") promptArgs[arg.name] = value;
-        }
-      }
-
-      const { messages } = await client.getPrompt({ name: promptName, arguments: promptArgs });
-      console.log("\nPrompt messages:\n");
-      for (const msg of messages) {
-        console.log(`[${msg.role}]`);
-        if (typeof msg.content === "string") {
-          console.log(msg.content);
-        } else if (msg.content?.type === "text") {
-          console.log(msg.content.text);
-        } else {
-          console.log(JSON.stringify(msg.content, null, 2));
-        }
-        console.log();
       }
       break;
     }
