@@ -56,13 +56,13 @@ Once a connection is saved, interact with it using:
   $ mcp-to-cli <connection> resources list           List available resources
   $ mcp-to-cli <connection> resources get <uri>      Read a resource by URI
   $ mcp-to-cli <connection> prompts list             List available prompts
-  $ mcp-to-cli <connection> prompts get <prompt>     Render a prompt (interactive args)`
+  $ mcp-to-cli <connection> prompts get <prompt>     Render a prompt (interactive args)`,
   )
   .version("0.1.0");
 
 // --- shared connect handler ---
 async function connectAction(url: string, opts: { name?: string }) {
-  const name = opts.name || new URL(url).hostname.split(".")[0];
+  const name = opts.name ?? new URL(url).hostname.split(".")[0] ?? "server";
   console.log(`Connecting to ${url} as "${name}"...`);
 
   try {
@@ -71,7 +71,9 @@ async function connectAction(url: string, opts: { name?: string }) {
 
     const capabilities = client.getServerCapabilities();
     const serverInfo = client.getServerVersion();
-    console.log(`\nConnected to ${serverInfo?.name || "server"} (${serverInfo?.version || "unknown"})`);
+    console.log(
+      `\nConnected to ${serverInfo?.name || "server"} (${serverInfo?.version || "unknown"})`,
+    );
     if (capabilities?.tools) console.log("  Tools: available");
     if (capabilities?.resources) console.log("  Resources: available");
     if (capabilities?.prompts) console.log("  Prompts: available");
@@ -192,16 +194,25 @@ async function handleServerCommand(serverName: string, args: string[]) {
   }
 }
 
-async function handleTools(client: any, serverName: string, action: string | undefined, extra: string[]) {
+async function handleTools(
+  client: any,
+  serverName: string,
+  action: string | undefined,
+  extra: string[],
+) {
   // Handle --help at the tools level (only if no valid action given)
   if (!action || wantsHelp([action])) {
     console.log(`Usage: mcp-to-cli ${serverName} tools <command>\n`);
     console.log("Commands:\n");
     console.log("  list [--offset N] [--limit N] [--full-description]   List available tools");
-    console.log("  get <tool>                                           Show a tool's input schema");
+    console.log(
+      "  get <tool>                                           Show a tool's input schema",
+    );
     console.log("  call <tool> [--args '{...}'] [--json]                Call a tool");
     console.log();
-    console.log("When calling a tool without --args, you will be prompted interactively for each argument.");
+    console.log(
+      "When calling a tool without --args, you will be prompted interactively for each argument.",
+    );
     return;
   }
 
@@ -211,8 +222,10 @@ async function handleTools(client: any, serverName: string, action: string | und
       const fullDescription = extra.includes("--full-description");
       const limitIdx = extra.indexOf("--limit");
       const offsetIdx = extra.indexOf("--offset");
-      const pageSize = limitIdx >= 0 && extra[limitIdx + 1] ? parseInt(extra[limitIdx + 1], 10) : 5;
-      const offset = offsetIdx >= 0 && extra[offsetIdx + 1] ? parseInt(extra[offsetIdx + 1], 10) : 0;
+      const limitArg = extra[limitIdx + 1];
+      const offsetArg = extra[offsetIdx + 1];
+      const pageSize = limitIdx >= 0 && limitArg ? parseInt(limitArg, 10) : 5;
+      const offset = offsetIdx >= 0 && offsetArg ? parseInt(offsetArg, 10) : 0;
 
       const { tools } = await client.listTools();
       if (tools.length === 0) {
@@ -232,25 +245,33 @@ async function handleTools(client: any, serverName: string, action: string | und
             console.log(`    ${tool.description}`);
           } else {
             anyTruncated = true;
-            console.log(`    ${tool.description.slice(0, MAX_DESC)}... (${tool.description.length} chars)`);
+            console.log(
+              `    ${tool.description.slice(0, MAX_DESC)}... (${tool.description.length} chars)`,
+            );
           }
         }
         console.log();
       }
 
       const showing = Math.min(page.length, pageSize);
-      console.log(`Showing ${offset + 1}-${offset + showing} of ${tools.length} tools (sorted alphabetically)`);
+      console.log(
+        `Showing ${offset + 1}-${offset + showing} of ${tools.length} tools (sorted alphabetically)`,
+      );
 
       if (offset + pageSize < tools.length) {
-        console.log(`Next page: mcp-to-cli ${serverName} tools list --offset ${offset + pageSize}${limitIdx >= 0 ? ` --limit ${pageSize}` : ""}`);
+        console.log(
+          `Next page: mcp-to-cli ${serverName} tools list --offset ${offset + pageSize}${limitIdx >= 0 ? ` --limit ${pageSize}` : ""}`,
+        );
       }
       if (anyTruncated) {
-        console.log(`Descriptions truncated to ${MAX_DESC} chars. Use --full-description to see full text.`);
+        console.log(
+          `Descriptions truncated to ${MAX_DESC} chars. Use --full-description to see full text.`,
+        );
       }
       break;
     }
     case "get": {
-      const toolName = extra.filter(a => !a.startsWith("-"))[0];
+      const toolName = extra.filter((a) => !a.startsWith("-"))[0];
       if (!toolName) {
         console.error("Usage: mcp-to-cli <name> tools get <tool_name>");
         process.exit(1);
@@ -268,12 +289,16 @@ async function handleTools(client: any, serverName: string, action: string | und
       break;
     }
     case "call": {
-      const toolName = extra.filter(a => !a.startsWith("-"))[0];
+      const toolName = extra.filter((a) => !a.startsWith("-"))[0];
       if (!toolName) {
         console.error("Usage: mcp-to-cli <name> tools call <tool_name> [--args '{...}']\n");
         console.error("Modes:");
-        console.error("  Interactive:  mcp-to-cli <name> tools call <tool>          (prompts for each argument)");
-        console.error("  Scripted:     mcp-to-cli <name> tools call <tool> --args '{\"key\":\"value\"}'");
+        console.error(
+          "  Interactive:  mcp-to-cli <name> tools call <tool>          (prompts for each argument)",
+        );
+        console.error(
+          '  Scripted:     mcp-to-cli <name> tools call <tool> --args \'{"key":"value"}\'',
+        );
         console.error("  Raw JSON:     Add --json to get unformatted JSON output");
         process.exit(1);
       }
@@ -283,10 +308,11 @@ async function handleTools(client: any, serverName: string, action: string | und
       // Check for --args flag
       const argsIdx = extra.indexOf("--args");
       let toolArgs: Record<string, any> = {};
+      const rawArgs = extra[argsIdx + 1];
 
-      if (argsIdx >= 0 && extra[argsIdx + 1]) {
+      if (argsIdx >= 0 && rawArgs) {
         try {
-          toolArgs = JSON.parse(extra[argsIdx + 1]);
+          toolArgs = JSON.parse(rawArgs);
         } catch {
           console.error("Invalid JSON for --args");
           process.exit(1);
@@ -302,7 +328,9 @@ async function handleTools(client: any, serverName: string, action: string | und
 
         const schema = tool.inputSchema;
         if (schema?.properties) {
-          console.log(`\nFill in arguments for "${toolName}" (press Enter to skip optional fields):\n`);
+          console.log(
+            `\nFill in arguments for "${toolName}" (press Enter to skip optional fields):\n`,
+          );
           for (const [key, prop] of Object.entries(schema.properties) as [string, any][]) {
             const required = schema.required?.includes(key);
             const desc = prop.description ? ` (${prop.description})` : "";
@@ -343,7 +371,9 @@ async function handleTools(client: any, serverName: string, action: string | und
         // Check for validation errors (common pattern: "Invalid arguments for tool ...")
         const validationMatch = msg.match(/Invalid arguments for tool [^:]+:\s*([\s\S]+)/);
         if (validationMatch) {
-          console.error(`\nInvalid arguments: ${formatValidationErrors(validationMatch[1].trim())}`);
+          console.error(
+            `\nInvalid arguments: ${formatValidationErrors(validationMatch[1].trim())}`,
+          );
         } else {
           console.error(`\n${formatMcpError(e)}`);
         }
@@ -410,7 +440,9 @@ async function handleTools(client: any, serverName: string, action: string | und
       }
 
       if (truncated) {
-        console.log(`\n... output truncated (${MAX_OUTPUT_LINES} lines shown). Use --json for full output.`);
+        console.log(
+          `\n... output truncated (${MAX_OUTPUT_LINES} lines shown). Use --json for full output.`,
+        );
       }
       break;
     }
@@ -419,7 +451,12 @@ async function handleTools(client: any, serverName: string, action: string | und
   }
 }
 
-async function handleResources(client: any, serverName: string, action: string | undefined, extra: string[]) {
+async function handleResources(
+  client: any,
+  serverName: string,
+  action: string | undefined,
+  extra: string[],
+) {
   if (!action || wantsHelp([action])) {
     console.log(`Usage: mcp-to-cli ${serverName} resources <command>\n`);
     console.log("Commands:\n");
@@ -451,7 +488,7 @@ async function handleResources(client: any, serverName: string, action: string |
     }
     case "get":
     case "read": {
-      const uri = extra.filter(a => !a.startsWith("-"))[0];
+      const uri = extra.filter((a) => !a.startsWith("-"))[0];
       if (!uri) {
         console.error("Usage: mcp-to-cli <name> resources get <uri>");
         process.exit(1);
@@ -476,7 +513,12 @@ async function handleResources(client: any, serverName: string, action: string |
   }
 }
 
-async function handlePrompts(client: any, serverName: string, action: string | undefined, extra: string[]) {
+async function handlePrompts(
+  client: any,
+  serverName: string,
+  action: string | undefined,
+  extra: string[],
+) {
   if (!action || wantsHelp([action])) {
     console.log(`Usage: mcp-to-cli ${serverName} prompts <command>\n`);
     console.log("Commands:\n");
@@ -511,7 +553,7 @@ async function handlePrompts(client: any, serverName: string, action: string | u
       break;
     }
     case "get": {
-      const promptName = extra.filter(a => !a.startsWith("-"))[0];
+      const promptName = extra.filter((a) => !a.startsWith("-"))[0];
       if (!promptName) {
         console.error("Usage: mcp-to-cli <name> prompts get <prompt_name>");
         process.exit(1);
