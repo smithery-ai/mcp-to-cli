@@ -1,6 +1,6 @@
 import { homedir } from "os";
 import { join } from "path";
-import { mkdir, readFile, writeFile, unlink, access, readdir } from "fs/promises";
+import { mkdir, readFile, writeFile, unlink, access, readdir, rm } from "fs/promises";
 
 const CONFIG_DIR = join(homedir(), ".mcp-to-cli");
 const PROFILES_DIR = join(CONFIG_DIR, "profiles");
@@ -51,6 +51,13 @@ export async function createProfile(name: string): Promise<void> {
   await mkdir(getProfileDir(name), { recursive: true });
 }
 
+export type RemoveProfileResult =
+  | { ok: true; removed: string[] }
+  | { ok: false; reason: "default" }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "active"; activeProfile: string }
+  | { ok: false; reason: "has_children"; children: string[] };
+
 export async function listProfiles(): Promise<{ name: string; active: boolean }[]> {
   await mkdir(PROFILES_DIR, { recursive: true });
   const active = getActiveProfile();
@@ -63,24 +70,45 @@ export async function listProfiles(): Promise<{ name: string; active: boolean }[
   }
 }
 
+export async function removeProfile(
+  name: string,
+  opts?: { recursive?: boolean },
+): Promise<RemoveProfileResult> {
+  if (name === "default") {
+    return { ok: false, reason: "default" };
+  }
+
+  const active = getActiveProfile();
+  if (active === name || active.startsWith(`${name}/`)) {
+    return { ok: false, reason: "active", activeProfile: active };
+  }
+
+  const profiles = await listProfiles();
+  if (!profiles.some((profile) => profile.name === name)) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const children = profiles
+    .map((profile) => profile.name)
+    .filter((profileName) => profileName.startsWith(`${name}/`))
+    .sort();
+
+  if (children.length > 0 && !opts?.recursive) {
+    return { ok: false, reason: "has_children", children };
+  }
+
+  await rm(getProfileDir(name), { recursive: true, force: false });
+  return { ok: true, removed: [name, ...children] };
+}
+
 async function findProfiles(base: string, prefix: string): Promise<string[]> {
   const entries = await readdir(join(base, prefix), { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory());
-  const files = entries.filter((e) => e.isFile());
-  const results: string[] = [];
+  const results: string[] = prefix ? [prefix] : [];
 
-  if (dirs.length === 0) {
-    // Leaf directory — it's a profile
-    if (prefix) results.push(prefix);
-  } else {
-    // Has subdirectories — check if this level is also a profile (has data files)
-    if (prefix && files.some((f) => f.name === "connections.json" || f.name.startsWith("auth-"))) {
-      results.push(prefix);
-    }
-    for (const dir of dirs) {
-      const child = prefix ? `${prefix}/${dir.name}` : dir.name;
-      results.push(...(await findProfiles(base, child)));
-    }
+  for (const dir of dirs) {
+    const child = prefix ? `${prefix}/${dir.name}` : dir.name;
+    results.push(...(await findProfiles(base, child)));
   }
   return results;
 }

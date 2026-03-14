@@ -85,6 +85,10 @@ mcp-to-cli profile create <name>
 # List all profiles
 mcp-to-cli profile list   # or: profile ls
 
+# Remove a profile
+mcp-to-cli profile remove <name>          # or: profile rm
+mcp-to-cli profile remove <name> --recursive
+
 # Use a profile with any command
 mcp-to-cli --profile <name> <command>   # or: -p <name>
 
@@ -92,7 +96,7 @@ mcp-to-cli --profile <name> <command>   # or: -p <name>
 export MCP_CLI_PROFILE=<name>
 ```
 
-Profiles can be nested (e.g., `acme/staging`). Child profiles inherit connections and auth from parents — the lookup chain for `acme/staging` is `default → acme → acme/staging`. Writes always target the current profile only.
+Profiles can be nested (e.g., `acme/staging`). Child profiles inherit connections and auth from parents — the lookup chain for `acme/staging` is `default → acme → acme/staging`. Writes always target the current profile only. Removing a profile with children requires `--recursive`.
 
 Resolution order: `--profile` flag > `MCP_CLI_PROFILE` env > `"default"`.
 
