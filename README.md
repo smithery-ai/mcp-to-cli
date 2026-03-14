@@ -10,8 +10,7 @@ Run directly with npx:
 npx mcp-to-cli@latest
 ```
 
-Or install as a Claude Code skill:
-
+Or install as a skill:
 ```bash
 npx skills add smithery-ai/mcp-to-cli
 ```
