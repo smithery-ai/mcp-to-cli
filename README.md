@@ -215,6 +215,15 @@ Resolution order: `--profile` flag > `MCP_CLI_PROFILE` env > `"default"`.
 mcp profile list
 ```
 
+### Remove a profile
+
+```bash
+mcp profile remove work
+mcp profile rm acme --recursive
+```
+
+Removing a profile deletes its saved connections and auth for that profile. If the profile has child profiles, pass `--recursive` to remove the whole subtree.
+
 ### Profile inheritance
 
 Child profiles inherit connections and auth from their parents. For profile `acme/staging`, the lookup chain is:

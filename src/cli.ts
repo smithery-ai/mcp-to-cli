@@ -9,6 +9,7 @@ import {
   getConnections,
   listProfiles,
   removeConnection,
+  removeProfile,
   setProfileOverride,
 } from "./config.ts";
 import { connectAndSave, createClient } from "./client.ts";
@@ -209,6 +210,42 @@ profile
         ? " (from MCP_CLI_PROFILE)"
         : "";
     console.log(`\nActive profile: ${active}${source}`);
+  });
+
+profile
+  .command("remove <name>")
+  .alias("rm")
+  .description("Remove a profile")
+  .option("-r, --recursive", "Also remove child profiles")
+  .action(async (name: string, opts: { recursive?: boolean }) => {
+    const result = await removeProfile(name, { recursive: Boolean(opts.recursive) });
+
+    if (result.ok) {
+      console.log(`Profile "${name}" removed.`);
+      if (result.removed.length > 1) {
+        console.log(`Also removed child profiles: ${result.removed.slice(1).join(", ")}`);
+      }
+      return;
+    }
+
+    switch (result.reason) {
+      case "default":
+        console.error('Profile "default" cannot be removed.');
+        break;
+      case "not_found":
+        console.error(`Profile "${name}" not found.`);
+        break;
+      case "active":
+        console.error(
+          `Cannot remove profile "${name}" because active profile "${result.activeProfile}" is in use.`,
+        );
+        break;
+      case "has_children":
+        console.error(`Profile "${name}" has child profiles: ${result.children.join(", ")}.`);
+        console.error("Re-run with --recursive to remove the whole profile subtree.");
+        break;
+    }
+    process.exit(1);
   });
 
 // --- Dynamic server subcommand ---
