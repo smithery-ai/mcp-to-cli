@@ -87,6 +87,24 @@ bun run fmt:check
 bun run typecheck
 ```
 
+## Release
+
+Dry-run an npm release locally:
+
+```bash
+bun install
+npm run release:dry-run
+```
+
+Publish the current package version to npm:
+
+```bash
+bun install
+npm run release
+```
+
+GitHub Actions can also publish on a `v*.*.*` tag push or via manual dispatch. Set the repository `NPM_TOKEN` secret first.
+
 ## CLI usage
 
 Top-level help:
