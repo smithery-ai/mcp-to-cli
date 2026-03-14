@@ -78,7 +78,7 @@ Once a connection is saved, interact with it using:
   $ mcp <connection> prompts get <prompt>     Render a prompt (interactive args)`,
   )
   .version("0.1.0")
-  .option("-p, --profile <name>", "Profile to use (default: MCP_CLI_PROFILE or \"default\")");
+  .option("-p, --profile <name>", 'Profile to use (default: MCP_CLI_PROFILE or "default")');
 
 // --- shared connect handler ---
 async function connectAction(
@@ -688,9 +688,11 @@ async function main() {
   const argv = process.argv.slice(2);
 
   // Extract --profile / -p early so it applies to dynamic server commands too
-  const profileIdx = argv.indexOf("--profile") >= 0 ? argv.indexOf("--profile") : argv.indexOf("-p");
-  if (profileIdx >= 0 && argv[profileIdx + 1]) {
-    setProfileOverride(argv[profileIdx + 1]);
+  const profileIdx =
+    argv.indexOf("--profile") >= 0 ? argv.indexOf("--profile") : argv.indexOf("-p");
+  const profileValue = profileIdx >= 0 ? argv[profileIdx + 1] : undefined;
+  if (profileIdx >= 0 && profileValue) {
+    setProfileOverride(profileValue);
     argv.splice(profileIdx, 2);
   }
 
