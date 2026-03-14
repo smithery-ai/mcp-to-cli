@@ -67,7 +67,7 @@ async function connectWithAuth(url: string, authProvider: CliOAuthProvider): Pro
 export async function createClient(name: string): Promise<Client> {
   const connection = await getConnection(name);
   if (!connection) {
-    throw new Error(`Connection "${name}" not found. Run: mcp-to-cli connect <url> --name ${name}`);
+    throw new Error(`Connection "${name}" not found. Run: mcp connect <url> --name ${name}`);
   }
 
   const authProvider = new CliOAuthProvider(

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Connect to remote MCP servers from the command line",
   "bin": {
-    "mcp-to-cli": "./src/cli.ts"
+    "mcp": "./src/cli.ts"
   },
   "type": "module",
   "module": "src/cli.ts",

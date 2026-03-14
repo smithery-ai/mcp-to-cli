@@ -1,4 +1,4 @@
-![mcp-to-cli](./image.png)
+<center><img src="./image.png" alt="mcp-to-cli" style="max-width: 500px;" /></center>
 
 # mcp-to-cli
 
@@ -13,9 +13,24 @@ npx mcp-to-cli@latest
 Or install as a skill:
 ```bash
 npx skills add smithery-ai/mcp-to-cli
+claude "use /mcp-cli to connect to https://mcp.deepwiki.com/mcp and tell me about browserbase/stagehand"
 ```
 
-`mcp-to-cli` is a Bun-based command-line client for connecting to remote Model Context Protocol (MCP) servers, saving named connections, and interacting with server tools, resources, and prompts from a terminal.
+## Use direct CLI
+
+```bash
+# Install globally
+npm i -g mcp-to-cli
+
+# Connect to a server (opens browser for OAuth if needed)
+mcp connect https://mcp.deepwiki.com/mcp --name deepwiki
+
+# List what tools are available
+mcp deepwiki tools list
+
+# Call a tool (args are validated locally with Zod before sending)
+mcp deepwiki tools call ask_question --args '{"repoName":"browserbase/stagehand", "question": "What does this do?"}'
+```
 
 ## What it does
 
@@ -76,32 +91,32 @@ bun start --help
 ### Save a connection
 
 ```bash
-mcp-to-cli connect https://example.com/mcp --name example
+mcp connect https://example.com/mcp --name example
 ```
 
 You can also pass a bare service name instead of a full URL. The CLI resolves it to `https://<name>.run.tools` (Smithery):
 
 ```bash
-mcp-to-cli connect linear        # → https://linear.run.tools
-mcp-to-cli connect notion        # → https://notion.run.tools
+mcp connect linear        # → https://linear.run.tools
+mcp connect notion        # → https://notion.run.tools
 ```
 
 Print the OAuth URL instead of opening a browser:
 
 ```bash
-mcp-to-cli connect https://example.com/mcp --name example --no-open
+mcp connect https://example.com/mcp --name example --no-open
 ```
 
-Use ngrok for OAuth callbacks:
+Use ngrok for OAuth callbacks (useful for OpenClaw/remote setups):
 
 ```bash
-mcp-to-cli connect https://example.com/mcp --name example --ngrok
+mcp connect https://example.com/mcp --name example --ngrok
 ```
 
 Equivalent command:
 
 ```bash
-mcp-to-cli connections add https://example.com/mcp --name example [--no-open]
+mcp connections add https://example.com/mcp --name example [--no-open]
 ```
 
 If `--name` is omitted, the CLI derives a name from the server hostname.
@@ -109,13 +124,13 @@ If `--name` is omitted, the CLI derives a name from the server hostname.
 ### List saved connections
 
 ```bash
-mcp-to-cli connections list
+mcp connections list
 ```
 
 ### Remove a saved connection
 
 ```bash
-mcp-to-cli connections remove example
+mcp connections remove example
 ```
 
 ## Working with a saved server
@@ -123,7 +138,7 @@ mcp-to-cli connections remove example
 After a server is saved, address it by connection name:
 
 ```bash
-mcp-to-cli <connection> <category> <command>
+mcp <connection> <category> <command>
 ```
 
 Supported categories:
@@ -137,37 +152,37 @@ Supported categories:
 List available tools:
 
 ```bash
-mcp-to-cli example tools list
+mcp example tools list
 ```
 
 Paginate and show full descriptions:
 
 ```bash
-mcp-to-cli example tools list --offset 0 --limit 10 --full-description
+mcp example tools list --offset 0 --limit 10 --full-description
 ```
 
 Inspect a tool schema:
 
 ```bash
-mcp-to-cli example tools get search_docs
+mcp example tools get search_docs
 ```
 
 Call a tool interactively:
 
 ```bash
-mcp-to-cli example tools call search_docs
+mcp example tools call search_docs
 ```
 
 Call a tool with JSON arguments:
 
 ```bash
-mcp-to-cli example tools call search_docs --args '{"query":"oauth"}'
+mcp example tools call search_docs --args '{"query":"oauth"}'
 ```
 
 Return raw JSON output:
 
 ```bash
-mcp-to-cli example tools call search_docs --args '{"query":"oauth"}' --json
+mcp example tools call search_docs --args '{"query":"oauth"}' --json
 ```
 
 ### Resources
@@ -175,13 +190,13 @@ mcp-to-cli example tools call search_docs --args '{"query":"oauth"}' --json
 List resources:
 
 ```bash
-mcp-to-cli example resources list
+mcp example resources list
 ```
 
 Read a resource:
 
 ```bash
-mcp-to-cli example resources get file:///docs/intro.md
+mcp example resources get file:///docs/intro.md
 ```
 
 ### Prompts
@@ -189,13 +204,13 @@ mcp-to-cli example resources get file:///docs/intro.md
 List prompts:
 
 ```bash
-mcp-to-cli example prompts list
+mcp example prompts list
 ```
 
 Render a prompt:
 
 ```bash
-mcp-to-cli example prompts get summarize_release
+mcp example prompts get summarize_release
 ```
 
 ## OAuth flow

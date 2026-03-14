@@ -55,19 +55,19 @@ function wantsHelp(args: string[]): boolean {
 }
 
 program
-  .name("mcp-to-cli")
+  .name("mcp")
   .description(
     `Connect to remote MCP servers and interact with their tools, resources, and prompts.
 
 Once a connection is saved, interact with it using:
 
-  $ mcp-to-cli <connection> tools list              List available tools
-  $ mcp-to-cli <connection> tools get <tool>        Show a tool's input schema
-  $ mcp-to-cli <connection> tools call <tool>       Call a tool (interactive or --args '{...}')
-  $ mcp-to-cli <connection> resources list           List available resources
-  $ mcp-to-cli <connection> resources get <uri>      Read a resource by URI
-  $ mcp-to-cli <connection> prompts list             List available prompts
-  $ mcp-to-cli <connection> prompts get <prompt>     Render a prompt (interactive args)`,
+  $ mcp <connection> tools list              List available tools
+  $ mcp <connection> tools get <tool>        Show a tool's input schema
+  $ mcp <connection> tools call <tool>       Call a tool (interactive or --args '{...}')
+  $ mcp <connection> resources list           List available resources
+  $ mcp <connection> resources get <uri>      Read a resource by URI
+  $ mcp <connection> prompts list             List available prompts
+  $ mcp <connection> prompts get <prompt>     Render a prompt (interactive args)`,
   )
   .version("0.1.0");
 
@@ -106,7 +106,7 @@ async function connectAction(
     if (capabilities?.resources) console.log("  Resources: available");
     if (capabilities?.prompts) console.log("  Prompts: available");
     console.log(`\nConnection saved as "${name}"`);
-    console.log(`\nTry: mcp-to-cli ${name} tools list`);
+    console.log(`\nTry: mcp ${name} tools list`);
 
     await client.close();
   } catch (e) {
@@ -142,7 +142,7 @@ connections
   .action(async () => {
     const conns = await getConnections();
     if (conns.length === 0) {
-      console.log("No connections saved. Use: mcp-to-cli connect <url> --name <name>");
+      console.log("No connections saved. Use: mcp connect <url> --name <name>");
       return;
     }
     console.log("Saved connections:\n");
@@ -151,9 +151,9 @@ connections
       console.log(`    URL: ${c.url}`);
       console.log(`    Added: ${c.addedAt}`);
       if (c.useNgrok) console.log(`    OAuth callback: ngrok`);
-      console.log(`    Try:  mcp-to-cli ${c.name} tools list\n`);
+      console.log(`    Try:  mcp ${c.name} tools list\n`);
     }
-    console.log("Usage: mcp-to-cli <connection> <tools|resources|prompts> <command>");
+    console.log("Usage: mcp <connection> <tools|resources|prompts> <command>");
   });
 
 connections
@@ -171,14 +171,14 @@ connections
   });
 
 // --- Dynamic server subcommand ---
-// We parse argv to detect `mcp-to-cli <name> tools list` pattern
+// We parse argv to detect `mcp <name> tools list` pattern
 // Commander doesn't natively support dynamic first-arg subcommands,
 // so we intercept before parsing.
 
 async function handleServerCommand(serverName: string, args: string[]) {
   const conn = await getConnection(serverName);
   if (!conn) {
-    console.error(`Unknown connection "${serverName}". Run: mcp-to-cli connections list`);
+    console.error(`Unknown connection "${serverName}". Run: mcp connections list`);
     process.exit(1);
   }
 
@@ -189,7 +189,7 @@ async function handleServerCommand(serverName: string, args: string[]) {
   const validCategories = ["tools", "resources", "prompts"];
   if (!category || (!validCategories.includes(category) && wantsHelp(args))) {
     console.log(`${serverName} (${conn.url})\n`);
-    console.log(`Usage: mcp-to-cli ${serverName} <command>\n`);
+    console.log(`Usage: mcp ${serverName} <command>\n`);
     console.log("Commands:\n");
     console.log(`  tools list                         List available tools`);
     console.log(`  tools get <tool>                   Show a tool's input schema`);
@@ -235,7 +235,7 @@ async function handleTools(
 ) {
   // Handle --help at the tools level (only if no valid action given)
   if (!action || wantsHelp([action])) {
-    console.log(`Usage: mcp-to-cli ${serverName} tools <command>\n`);
+    console.log(`Usage: mcp ${serverName} tools <command>\n`);
     console.log("Commands:\n");
     console.log("  list [--offset N] [--limit N] [--full-description]   List available tools");
     console.log(
@@ -293,7 +293,7 @@ async function handleTools(
 
       if (offset + pageSize < tools.length) {
         console.log(
-          `Next page: mcp-to-cli ${serverName} tools list --offset ${offset + pageSize}${limitIdx >= 0 ? ` --limit ${pageSize}` : ""}`,
+          `Next page: mcp ${serverName} tools list --offset ${offset + pageSize}${limitIdx >= 0 ? ` --limit ${pageSize}` : ""}`,
         );
       }
       if (anyTruncated) {
@@ -306,7 +306,7 @@ async function handleTools(
     case "get": {
       const toolName = extra.filter((a) => !a.startsWith("-"))[0];
       if (!toolName) {
-        console.error("Usage: mcp-to-cli <name> tools get <tool_name>");
+        console.error("Usage: mcp <name> tools get <tool_name>");
         process.exit(1);
       }
       const tool = await getToolByName(client, toolName);
@@ -323,13 +323,13 @@ async function handleTools(
     case "call": {
       const toolName = extra.filter((a) => !a.startsWith("-"))[0];
       if (!toolName) {
-        console.error("Usage: mcp-to-cli <name> tools call <tool_name> [--args '{...}']\n");
+        console.error("Usage: mcp <name> tools call <tool_name> [--args '{...}']\n");
         console.error("Modes:");
         console.error(
-          "  Interactive:  mcp-to-cli <name> tools call <tool>          (prompts for each argument)",
+          "  Interactive:  mcp <name> tools call <tool>          (prompts for each argument)",
         );
         console.error(
-          '  Scripted:     mcp-to-cli <name> tools call <tool> --args \'{"key":"value"}\'',
+          '  Scripted:     mcp <name> tools call <tool> --args \'{"key":"value"}\'',
         );
         console.error("  Raw JSON:     Add --json to get unformatted JSON output");
         process.exit(1);
@@ -489,7 +489,7 @@ async function handleTools(
       break;
     }
     default:
-      console.log(`Usage: mcp-to-cli ${serverName} tools <list|get|call> [tool_name]`);
+      console.log(`Usage: mcp ${serverName} tools <list|get|call> [tool_name]`);
   }
 }
 
@@ -500,7 +500,7 @@ async function handleResources(
   extra: string[],
 ) {
   if (!action || wantsHelp([action])) {
-    console.log(`Usage: mcp-to-cli ${serverName} resources <command>\n`);
+    console.log(`Usage: mcp ${serverName} resources <command>\n`);
     console.log("Commands:\n");
     console.log("  list            List available resources");
     console.log("  get <uri>       Read a resource by URI");
@@ -532,7 +532,7 @@ async function handleResources(
     case "read": {
       const uri = extra.filter((a) => !a.startsWith("-"))[0];
       if (!uri) {
-        console.error("Usage: mcp-to-cli <name> resources get <uri>");
+        console.error("Usage: mcp <name> resources get <uri>");
         process.exit(1);
       }
       try {
@@ -551,7 +551,7 @@ async function handleResources(
       break;
     }
     default:
-      console.log(`Usage: mcp-to-cli ${serverName} resources <list|get> [uri]`);
+      console.log(`Usage: mcp ${serverName} resources <list|get> [uri]`);
   }
 }
 
@@ -562,7 +562,7 @@ async function handlePrompts(
   extra: string[],
 ) {
   if (!action || wantsHelp([action])) {
-    console.log(`Usage: mcp-to-cli ${serverName} prompts <command>\n`);
+    console.log(`Usage: mcp ${serverName} prompts <command>\n`);
     console.log("Commands:\n");
     console.log("  list              List available prompts");
     console.log("  get <prompt>      Render a prompt (interactive args)");
@@ -597,7 +597,7 @@ async function handlePrompts(
     case "get": {
       const promptName = extra.filter((a) => !a.startsWith("-"))[0];
       if (!promptName) {
-        console.error("Usage: mcp-to-cli <name> prompts get <prompt_name>");
+        console.error("Usage: mcp <name> prompts get <prompt_name>");
         process.exit(1);
       }
 
@@ -640,7 +640,7 @@ async function handlePrompts(
       break;
     }
     default:
-      console.log(`Usage: mcp-to-cli ${serverName} prompts <list|get> [prompt_name]`);
+      console.log(`Usage: mcp ${serverName} prompts <list|get> [prompt_name]`);
   }
 }
 
@@ -653,7 +653,7 @@ async function main() {
   const firstArg = argv[0];
 
   if (firstArg && !knownCommands.includes(firstArg) && !firstArg.startsWith("-")) {
-    // Could be a server name like `mcp-to-cli notion tools list`
+    // Could be a server name like `mcp notion tools list`
     // Check if it's a stored connection
     const conn = await getConnection(firstArg);
     if (conn) {
@@ -664,7 +664,7 @@ async function main() {
     // Fall through to commander
   }
 
-  await program.parseAsync(["node", "mcp-to-cli", ...argv]);
+  await program.parseAsync(["node", "mcp", ...argv]);
 }
 
 main().catch((e) => {
