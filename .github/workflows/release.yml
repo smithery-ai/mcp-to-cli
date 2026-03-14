@@ -36,7 +36,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.release_created }}
@@ -45,3 +45,5 @@ jobs:
       - name: Publish to npm
         if: ${{ steps.release.outputs.release_created }}
         run: npm run release
+        env:
+          NPM_CONFIG_PROVENANCE: true
