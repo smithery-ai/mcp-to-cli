@@ -2,11 +2,34 @@
   "name": "mcp-to-cli",
   "version": "0.4.0",
   "description": "Connect to remote MCP servers from the command line",
-  "bin": {
-    "mcp": "./dist/cli.js"
+  "homepage": "https://github.com/smithery-ai/mcp-to-cli#readme",
+  "bugs": {
+    "url": "https://github.com/smithery-ai/mcp-to-cli/issues"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smithery-ai/mcp-to-cli.git"
+  },
+  "bin": {
+    "mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "SKILL.md"
+  ],
   "type": "module",
-  "module": "src/cli.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "start": "bun src/cli.ts",
@@ -17,6 +40,8 @@
     "fmt:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit",
     "check": "bun run fmt:check && bun run lint && bun run typecheck",
+    "release:dry-run": "bun run check && bun run build && npm publish --dry-run --ignore-scripts",
+    "release": "bun run check && bun run build && npm publish --ignore-scripts",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
@@ -37,5 +62,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

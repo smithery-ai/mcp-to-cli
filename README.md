@@ -87,6 +87,41 @@ bun run fmt:check
 bun run typecheck
 ```
 
+## Release
+
+This repo now uses `release-please` to infer version bumps and changelog entries from Conventional Commit messages.
+
+Use release-worthy commit prefixes on changes that should ship:
+
+- `fix:` for patch releases
+- `feat:` for minor releases
+- `feat!:` or `fix!:` for major releases
+
+On every push to `main`, GitHub Actions runs `release-please` and either:
+
+- open or update a release pull request that bumps versions and regenerates `CHANGELOG.md`
+- create a GitHub release and publish to npm after that release pull request is merged
+
+If you need to force a specific version, `release-please` also supports a `Release-As: x.y.z` footer in the commit body.
+
+To dry-run the publish locally:
+
+```bash
+bun install
+npm run release:dry-run
+```
+
+To publish manually from an authenticated machine:
+
+```bash
+npm run release
+```
+
+Repository setup required:
+
+- add the `NPM_TOKEN` GitHub Actions secret
+- use Conventional Commit messages on merge commits or squash commit titles
+
 ## CLI usage
 
 Top-level help:
