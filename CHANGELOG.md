@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2](https://github.com/smithery-ai/mcp-to-cli/compare/mcp-to-cli-v0.5.1...mcp-to-cli-v0.5.2) (2026-03-14)
+
+
+### Bug Fixes
+
+* add OIDC permissions and provenance flag for npm trusted publishing ([fc367ea](https://github.com/smithery-ai/mcp-to-cli/commit/fc367ea66c16c468145a0ea2af02cfa97bcf333c))
+* use OIDC trusted publishing without NODE_AUTH_TOKEN ([f4a2d99](https://github.com/smithery-ai/mcp-to-cli/commit/f4a2d9929d07cfcdc94939166308dd9e2fd1e1b8))
+
 ## [0.5.1](https://github.com/smithery-ai/mcp-to-cli/compare/mcp-to-cli-v0.5.0...mcp-to-cli-v0.5.1) (2026-03-14)
 
 
