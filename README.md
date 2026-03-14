@@ -140,6 +140,58 @@ mcp connections list
 mcp connections remove example
 ```
 
+## Profiles
+
+Profiles let you maintain separate sets of connections and credentials. For example, keep work and personal MCP servers isolated, or split staging from production.
+
+### Create a profile
+
+```bash
+mcp profile create work
+mcp profile create acme/staging
+mcp profile create acme/prod
+```
+
+Profiles can be nested — `acme/staging` and `acme/prod` are children of `acme`.
+
+### Use a profile
+
+Either pass `--profile` (or `-p`) to any command:
+
+```bash
+mcp --profile work connect https://linear.run.tools
+mcp --profile work connections list
+mcp -p work linear tools list
+```
+
+Or set the `MCP_CLI_PROFILE` environment variable:
+
+```bash
+export MCP_CLI_PROFILE=work
+mcp connect https://linear.run.tools
+mcp connections list
+```
+
+Resolution order: `--profile` flag > `MCP_CLI_PROFILE` env > `"default"`.
+
+### List profiles
+
+```bash
+mcp profile list
+```
+
+### Profile inheritance
+
+Child profiles inherit connections and auth from their parents. For profile `acme/staging`, the lookup chain is:
+
+```
+default → acme → acme/staging
+```
+
+Connections are merged (child overrides parent for the same name). Auth is resolved from most specific to least specific — if `acme/staging` doesn't have auth for a connection, it checks `acme`, then `default`.
+
+Writes (adding connections, saving auth) always target the current profile only.
+
 ## Working with a saved server
 
 After a server is saved, address it by connection name:
@@ -236,9 +288,20 @@ Saved connection metadata and auth state are stored under:
 
 ```text
 ~/.mcp-to-cli/
+  profiles/
+    default/
+      connections.json
+      auth-<name>.json
+    work/
+      connections.json
+      auth-<name>.json
+    acme/
+      staging/
+        connections.json
+        auth-<name>.json
 ```
 
-That directory contains:
+Each profile has its own directory containing:
 
 - `connections.json` for saved servers
 - `auth-<name>.json` for per-connection OAuth state
