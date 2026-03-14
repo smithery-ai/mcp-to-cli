@@ -1,7 +1,16 @@
 import { Command } from "commander";
 import { input } from "@inquirer/prompts";
 import type { ZodError } from "zod/v4";
-import { addConnection, getConnection, getConnections, removeConnection } from "./config.ts";
+import {
+  addConnection,
+  createProfile,
+  getActiveProfile,
+  getConnection,
+  getConnections,
+  listProfiles,
+  removeConnection,
+  setProfileOverride,
+} from "./config.ts";
 import { connectAndSave, createClient } from "./client.ts";
 import { getToolByName, validateToolArguments } from "./tools.ts";
 
@@ -68,7 +77,8 @@ Once a connection is saved, interact with it using:
   $ mcp <connection> prompts list             List available prompts
   $ mcp <connection> prompts get <prompt>     Render a prompt (interactive args)`,
   )
-  .version("0.1.0");
+  .version("0.1.0")
+  .option("-p, --profile <name>", 'Profile to use (default: MCP_CLI_PROFILE or "default")');
 
 // --- shared connect handler ---
 async function connectAction(
@@ -167,6 +177,38 @@ connections
       console.error(`Connection "${name}" not found.`);
       process.exit(1);
     }
+  });
+
+// --- profile command ---
+const profile = program.command("profile").description("Manage profiles");
+
+profile
+  .command("create <name>")
+  .description("Create a new profile")
+  .action(async (name: string) => {
+    await createProfile(name);
+    console.log(`Profile "${name}" created.`);
+    console.log(`\nUse it with: mcp --profile ${name} connect <url>`);
+    console.log(`Or set:      export MCP_CLI_PROFILE=${name}`);
+  });
+
+profile
+  .command("list")
+  .alias("ls")
+  .description("List all profiles")
+  .action(async () => {
+    const profiles = await listProfiles();
+    console.log("Profiles:\n");
+    for (const p of profiles) {
+      console.log(`  ${p.active ? "* " : "  "}${p.name}`);
+    }
+    const active = getActiveProfile();
+    const source = program.opts().profile
+      ? " (from --profile)"
+      : process.env.MCP_CLI_PROFILE
+        ? " (from MCP_CLI_PROFILE)"
+        : "";
+    console.log(`\nActive profile: ${active}${source}`);
   });
 
 // --- Dynamic server subcommand ---
@@ -645,8 +687,26 @@ async function handlePrompts(
 async function main() {
   const argv = process.argv.slice(2);
 
+  // Extract --profile / -p early so it applies to dynamic server commands too
+  const profileIdx =
+    argv.indexOf("--profile") >= 0 ? argv.indexOf("--profile") : argv.indexOf("-p");
+  const profileValue = profileIdx >= 0 ? argv[profileIdx + 1] : undefined;
+  if (profileIdx >= 0 && profileValue) {
+    setProfileOverride(profileValue);
+    argv.splice(profileIdx, 2);
+  }
+
   // Check if the first arg is a known subcommand
-  const knownCommands = ["connect", "connections", "help", "--help", "-h", "--version", "-V"];
+  const knownCommands = [
+    "connect",
+    "connections",
+    "profile",
+    "help",
+    "--help",
+    "-h",
+    "--version",
+    "-V",
+  ];
   const firstArg = argv[0];
 
   if (firstArg && !knownCommands.includes(firstArg) && !firstArg.startsWith("-")) {

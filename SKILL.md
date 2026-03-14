@@ -74,7 +74,27 @@ mcp-to-cli connections remove <name> # or: connections rm
 
 If `--name` is omitted, the CLI extracts a name from the URL hostname (e.g., `https://mcp.notion.com/mcp` becomes `notion`).
 
-Connections are stored in `~/.mcp-to-cli/connections.json`.
+Connections are stored in `~/.mcp-to-cli/profiles/<profile>/connections.json`.
+
+### Profiles
+
+```bash
+# Create a profile
+mcp-to-cli profile create <name>
+
+# List all profiles
+mcp-to-cli profile list   # or: profile ls
+
+# Use a profile with any command
+mcp-to-cli --profile <name> <command>   # or: -p <name>
+
+# Or set via environment variable
+export MCP_CLI_PROFILE=<name>
+```
+
+Profiles can be nested (e.g., `acme/staging`). Child profiles inherit connections and auth from parents — the lookup chain for `acme/staging` is `default → acme → acme/staging`. Writes always target the current profile only.
+
+Resolution order: `--profile` flag > `MCP_CLI_PROFILE` env > `"default"`.
 
 ### Tools
 
@@ -122,7 +142,7 @@ The CLI supports OAuth 2.0 with PKCE. When a server requires authentication:
 2. By default it opens your browser to the authorization URL. Pass `--no-open` to print the URL instead.
 3. A shared local callback server listens on `http://localhost:8912/<connection>/callback`
 4. After you authorize in the browser, the CLI exchanges the code for tokens
-5. Tokens are saved to `~/.mcp-to-cli/auth-<connection-name>.json` and reused automatically
+5. Tokens are saved to `~/.mcp-to-cli/profiles/<profile>/auth-<connection-name>.json` and reused automatically
 6. The `--no-open` preference is saved with the connection and used automatically on future requests
 
 If the browser doesn't open automatically, the CLI prints the authorization URL to the terminal — copy and paste it into your browser.
@@ -156,12 +176,14 @@ mcp-to-cli <connection> tools call --help
 
 ## Configuration Files
 
-All config lives in `~/.mcp-to-cli/`:
+All config lives in `~/.mcp-to-cli/profiles/<profile>/`:
 
 | File               | Purpose                                         |
 | ------------------ | ----------------------------------------------- |
 | `connections.json` | Saved server connections (name, URL, timestamp) |
 | `auth-<name>.json` | OAuth tokens for each connection                |
+
+Profiles are directories under `~/.mcp-to-cli/profiles/`. The default profile is `default`. Child profiles (e.g., `acme/staging`) inherit from parents.
 
 ## Running in Development
 
