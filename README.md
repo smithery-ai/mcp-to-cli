@@ -2,6 +2,12 @@
 
 # mcp-to-cli
 
+MCP servers are great for universal compatibility with agents, but for every coding agent you use, you have to re-connect to each server. Also, if your coding agent doesn't have a good harness for tool search, your MCP servers can unnecessarily eat up a ton of context.
+
+
+
+`mcp-to-cli` fixes this. It's a **fully local** command-line client that saves named connections to remote MCP servers in one place (`~/.mcp-to-cli/`). Connect once, use everywhere — any tool that can shell out to a CLI can call MCP tools through it.
+
 ## Quick start
 
 Run directly with npx:
@@ -22,8 +28,9 @@ claude "use /mcp-cli to connect to https://mcp.deepwiki.com/mcp and tell me abou
 # Install globally
 npm i -g mcp-to-cli
 
-# Connect to a server (opens browser for OAuth if needed)
-mcp connect https://mcp.deepwiki.com/mcp --name deepwiki
+# Connect to a server 
+#   (opens browser for OAuth, or ngrok URL for remote setups like OpenClaw)
+mcp connect https://mcp.deepwiki.com/mcp --name deepwiki --ngrok
 
 # List what tools are available
 mcp deepwiki tools list
@@ -40,6 +47,7 @@ mcp deepwiki tools call ask_question --args '{"repoName":"browserbase/stagehand"
 - Lists tool, resource, and prompt capabilities exposed by a server.
 - Validates tool arguments locally against each tool's input schema before sending the call.
 - Calls tools interactively or with JSON arguments from the command line.
+- MCP URLs can be safely guessed via [run.tools](https://run.tools) shortcuts (requires a [Smithery](https://smithery.ai) account), i.e. `mcp connect notion` -> `mcp connect https://notion.run.tools`
 
 ## Requirements
 
