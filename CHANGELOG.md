@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/smithery-ai/mcp-to-cli/compare/mcp-to-cli-v0.5.0...mcp-to-cli-v0.5.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* don't run check on changelog ([3bc0f34](https://github.com/smithery-ai/mcp-to-cli/commit/3bc0f34366e987dc4463c1efd09e032b8199d3d8))
+
 ## [0.5.0](https://github.com/smithery-ai/mcp-to-cli/compare/mcp-to-cli-v0.4.0...mcp-to-cli-v0.5.0) (2026-03-14)
 
 
