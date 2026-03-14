@@ -41,7 +41,7 @@
     "typecheck": "tsc --noEmit",
     "check": "bun run fmt:check && bun run lint && bun run typecheck",
     "release:dry-run": "bun run check && bun run build && npm publish --dry-run --ignore-scripts",
-    "release": "bun run check && bun run build && npm publish --ignore-scripts",
+    "release": "bun run check && bun run build && npm publish --ignore-scripts --provenance",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
