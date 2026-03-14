@@ -1,4 +1,12 @@
+![mcp-to-cli](./image.png)
+
 # mcp-to-cli
+
+## Install as a Claude Code skill
+
+```bash
+npx skills add smithery-ai/mcp-to-cli
+```
 
 `mcp-to-cli` is a Bun-based command-line client for connecting to remote Model Context Protocol (MCP) servers, saving named connections, and interacting with server tools, resources, and prompts from a terminal.
 
