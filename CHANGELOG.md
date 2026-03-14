@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/smithery-ai/mcp-to-cli/compare/mcp-to-cli-v0.5.2...mcp-to-cli-v0.5.3) (2026-03-14)
+
+
+### Bug Fixes
+
+* use Node 24 for npm OIDC trusted publishing support ([ff62597](https://github.com/smithery-ai/mcp-to-cli/commit/ff6259742479c6b28ae731510f616e9a53866390))
+
 ## [0.5.2](https://github.com/smithery-ai/mcp-to-cli/compare/mcp-to-cli-v0.5.1...mcp-to-cli-v0.5.2) (2026-03-14)
 
 

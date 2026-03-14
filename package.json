@@ -1,6 +1,6 @@
 {
   "name": "mcp-to-cli",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Connect to remote MCP servers from the command line",
   "homepage": "https://github.com/smithery-ai/mcp-to-cli#readme",
   "bugs": {
