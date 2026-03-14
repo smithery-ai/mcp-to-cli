@@ -1,6 +1,6 @@
 {
   "name": "mcp-to-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Connect to remote MCP servers from the command line",
   "bin": {
     "mcp": "./src/cli.ts"
