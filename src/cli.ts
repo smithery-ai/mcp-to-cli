@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { Command } from "commander";
 import { input } from "@inquirer/prompts";
 import type { ZodError } from "zod/v4";

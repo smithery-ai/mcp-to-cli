@@ -1,3 +1,5 @@
+import { createServer, type Server } from "http";
+
 const CALLBACK_PORT = 8912;
 
 type CallbackRegistration = {
@@ -5,26 +7,20 @@ type CallbackRegistration = {
   resolve: (code: string) => void;
 };
 
-let callbackServer: ReturnType<typeof Bun.serve> | null = null;
+let callbackServer: Server | null = null;
 const callbacks = new Map<string, CallbackRegistration>();
 
 function successHtml() {
-  return new Response(
-    "<html><body><h1>Authorization successful!</h1><p>You can close this tab and return to the terminal.</p></body></html>",
-    { headers: { "Content-Type": "text/html" } },
-  );
+  return "<html><body><h1>Authorization successful!</h1><p>You can close this tab and return to the terminal.</p></body></html>";
 }
 
 function errorHtml(message: string) {
-  return new Response(`<html><body><h1>Authorization failed</h1><p>${message}</p></body></html>`, {
-    status: 400,
-    headers: { "Content-Type": "text/html" },
-  });
+  return `<html><body><h1>Authorization failed</h1><p>${message}</p></body></html>`;
 }
 
 function stopCallbackServerIfIdle() {
   if (callbacks.size === 0 && callbackServer) {
-    callbackServer.stop();
+    callbackServer.close();
     callbackServer = null;
   }
 }
@@ -32,31 +28,34 @@ function stopCallbackServerIfIdle() {
 function ensureCallbackServer() {
   if (callbackServer) return callbackServer;
 
-  callbackServer = Bun.serve({
-    port: CALLBACK_PORT,
-    fetch(req) {
-      const url = new URL(req.url);
-      const callback = callbacks.get(url.pathname);
-      if (!callback) {
-        return new Response("Not found", { status: 404 });
-      }
+  callbackServer = createServer((req, res) => {
+    const url = new URL(req.url || "/", `http://localhost:${CALLBACK_PORT}`);
+    const callback = callbacks.get(url.pathname);
+    if (!callback) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
+      return;
+    }
 
-      const code = url.searchParams.get("code");
-      if (code) {
-        callbacks.delete(url.pathname);
-        stopCallbackServerIfIdle();
-        callback.resolve(code);
-        return successHtml();
-      }
-
-      const error = url.searchParams.get("error") ?? "Missing authorization code";
+    const code = url.searchParams.get("code");
+    if (code) {
       callbacks.delete(url.pathname);
       stopCallbackServerIfIdle();
-      callback.reject(new Error(`Authorization failed: ${error}`));
-      return errorHtml(error);
-    },
+      callback.resolve(code);
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(successHtml());
+      return;
+    }
+
+    const error = url.searchParams.get("error") ?? "Missing authorization code";
+    callbacks.delete(url.pathname);
+    stopCallbackServerIfIdle();
+    callback.reject(new Error(`Authorization failed: ${error}`));
+    res.writeHead(400, { "Content-Type": "text/html" });
+    res.end(errorHtml(error));
   });
 
+  callbackServer.listen(CALLBACK_PORT);
   return callbackServer;
 }
 

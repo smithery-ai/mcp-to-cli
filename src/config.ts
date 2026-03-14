@@ -1,6 +1,6 @@
 import { homedir } from "os";
 import { join } from "path";
-import { mkdir } from "fs/promises";
+import { mkdir, readFile, writeFile, unlink, access } from "fs/promises";
 
 const CONFIG_DIR = join(homedir(), ".mcp-to-cli");
 const CONNECTIONS_FILE = join(CONFIG_DIR, "connections.json");
@@ -28,16 +28,25 @@ async function ensureConfigDir() {
   await mkdir(CONFIG_DIR, { recursive: true });
 }
 
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getConnections(): Promise<StoredConnection[]> {
   await ensureConfigDir();
-  const file = Bun.file(CONNECTIONS_FILE);
-  if (!(await file.exists())) return [];
-  return file.json();
+  if (!(await fileExists(CONNECTIONS_FILE))) return [];
+  const data = await readFile(CONNECTIONS_FILE, "utf-8");
+  return JSON.parse(data);
 }
 
 export async function saveConnections(connections: StoredConnection[]) {
   await ensureConfigDir();
-  await Bun.write(CONNECTIONS_FILE, JSON.stringify(connections, null, 2));
+  await writeFile(CONNECTIONS_FILE, JSON.stringify(connections, null, 2));
 }
 
 export async function getConnection(name: string): Promise<StoredConnection | undefined> {
@@ -62,9 +71,7 @@ export async function removeConnection(name: string): Promise<boolean> {
   if (filtered.length === connections.length) return false;
   await saveConnections(filtered);
   // Also remove auth file
-  const authFile = Bun.file(getAuthPath(name));
-  if (await authFile.exists()) {
-    const { unlink } = await import("fs/promises");
+  if (await fileExists(getAuthPath(name))) {
     await unlink(getAuthPath(name));
   }
   return true;
@@ -76,14 +83,15 @@ function getAuthPath(name: string): string {
 
 export async function getStoredAuth(name: string): Promise<StoredAuth | undefined> {
   await ensureConfigDir();
-  const file = Bun.file(getAuthPath(name));
-  if (!(await file.exists())) return undefined;
-  return file.json();
+  const authPath = getAuthPath(name);
+  if (!(await fileExists(authPath))) return undefined;
+  const data = await readFile(authPath, "utf-8");
+  return JSON.parse(data);
 }
 
 export async function saveAuth(name: string, auth: StoredAuth) {
   await ensureConfigDir();
-  await Bun.write(getAuthPath(name), JSON.stringify(auth, null, 2));
+  await writeFile(getAuthPath(name), JSON.stringify(auth, null, 2));
 }
 
 export { CONFIG_DIR };
