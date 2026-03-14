@@ -327,9 +327,7 @@ async function handleTools(
         console.error(
           "  Interactive:  mcp <name> tools call <tool>          (prompts for each argument)",
         );
-        console.error(
-          '  Scripted:     mcp <name> tools call <tool> --args \'{"key":"value"}\'',
-        );
+        console.error('  Scripted:     mcp <name> tools call <tool> --args \'{"key":"value"}\'');
         console.error("  Raw JSON:     Add --json to get unformatted JSON output");
         process.exit(1);
       }

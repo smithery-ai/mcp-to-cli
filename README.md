@@ -4,8 +4,6 @@
 
 MCP servers are great for universal compatibility with agents, but for every coding agent you use, you have to re-connect to each server. Also, if your coding agent doesn't have a good harness for tool search, your MCP servers can unnecessarily eat up a ton of context.
 
-
-
 `mcp-to-cli` fixes this. It's a **fully local** command-line client that saves named connections to remote MCP servers in one place (`~/.mcp-to-cli/`). Connect once, use everywhere — any tool that can shell out to a CLI can call MCP tools through it.
 
 ## Quick start
@@ -17,6 +15,7 @@ npx mcp-to-cli@latest
 ```
 
 Or install as a skill:
+
 ```bash
 npx skills add smithery-ai/mcp-to-cli
 claude "use /mcp-cli to connect to https://mcp.deepwiki.com/mcp and tell me about browserbase/stagehand"
@@ -28,7 +27,7 @@ claude "use /mcp-cli to connect to https://mcp.deepwiki.com/mcp and tell me abou
 # Install globally
 npm i -g mcp-to-cli
 
-# Connect to a server 
+# Connect to a server
 #   (opens browser for OAuth, or ngrok URL for remote setups like OpenClaw)
 mcp connect https://mcp.deepwiki.com/mcp --name deepwiki --ngrok
 
